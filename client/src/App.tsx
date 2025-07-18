@@ -16,6 +16,7 @@ import LlmConfig from "@/pages/llm-config";
 import Analytics from "@/pages/analytics";
 import { StagewiseToolbar } from '@stagewise/toolbar-react';
 import ReactPlugin from '@stagewise-plugins/react';
+import ProjectDetailsPage from "@/pages/projects/[id]";
 
 function AppContent() {
   const { user, isLoading } = useAuth();
@@ -60,6 +61,7 @@ function AppContent() {
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/projects" component={Projects} />
+            <Route path="/projects/:id" component={ProjectDetailsPage} />
             <Route path="/weekly-reports" component={WeeklyReports} />
             <Route path="/technical-reviews" component={TechnicalReviews} />
             <Route path="/analytics" component={Analytics} />

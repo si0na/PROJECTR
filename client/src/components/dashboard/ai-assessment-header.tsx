@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Bot, BarChart3, Activity, Star, Circle } from "lucide-react";
 import type { PortfolioAnalysis, Project } from "@shared/schema";
+import React from "react";
 
 export function AIAssessmentHeader() {
   const { data: analysis, isLoading } = useQuery<PortfolioAnalysis>({
@@ -90,6 +91,28 @@ const primaryRecommendation = analysis?.reason ? getPrimaryRecommendation(analys
 
   const strategicCount = projects?.filter((p) => p.projectImportance === "Strategic").length || 0;
 
+  const [selectedStatus, setSelectedStatus] = React.useState<"green" | "amber" | "red" | null>(null);
+
+  const handleStatusClick = (status: "green" | "amber" | "red") => {
+    setSelectedStatus(selectedStatus === status ? null : status);
+  };
+
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setSelectedStatus(null);
+      }
+    }
+    if (selectedStatus) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [selectedStatus]);
+
   if (isLoading) {
     return <div className="p-8">Loading...</div>;
   }
@@ -164,29 +187,116 @@ const primaryRecommendation = analysis?.reason ? getPrimaryRecommendation(analys
 <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-6 border-2 border-indigo-200">
   <div className="flex items-center space-x-3 mb-4">
     <div className="w-8 h-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center">
-      <Bot className="h-4 w-4 text-white" />
+      {/* Modern minimalistic icon */}
+      <svg width="20" height="20" fill="none" viewBox="0 0 20 20">
+        <circle cx="10" cy="10" r="7" stroke="white" strokeWidth="2"/>
+        <path d="M7 10l2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
     </div>
     <h3 className="font-semibold text-gray-900">AI Analysis & Recommendations</h3>
   </div>
 
   {/* Replaced Paragraph with AI Recommendation */}
-  <p className="text-sm text-gray-700 leading-relaxed mb-4">
-    {primaryRecommendation || "Review portfolio and address critical issues immediately."}
-  </p>
+  <div className="text-xs text-gray-500 mb-2">
+    <span className="font-medium">Last Updated:</span> July 18, 2025 &nbsp;|&nbsp; <span className="font-medium">Active Projects:</span> 13
+  </div>
+  <div className="text-sm text-gray-700 leading-relaxed mb-4 space-y-2">
+    <div>
+      <span className="font-semibold text-red-600">🔴 Immediate focus:</span> CALX Compass, Seymour Whyte Connect<br/>
+      <span className="ml-6">API and client confirmation blockages threaten delivery.</span>
+    </div>
+    <div>
+      <span className="font-semibold text-amber-600">🟠 Amber risk:</span> Brandix HRMS<br/>
+      <span className="ml-6">Support transition delayed; urgent resource alignment needed.</span>
+    </div>
+    <div>
+      <span className="font-semibold text-green-600">✅ Stable projects:</span> 77% of portfolio on track.
+    </div>
+    <div>
+      <span className="font-semibold text-purple-700">⚡ Top risk driver:</span> API dependencies (impacting 2/3 at-risk projects).
+    </div>
+    <div>
+      <span className="font-semibold text-blue-700">📈 Key action:</span> Escalate blockers and realign resources for at-risk projects.
+    </div>
+  </div>
 
   <div className="flex items-center space-x-4 mb-4">
-    <span className="inline-flex items-center space-x-1 text-sm text-green-700">
-      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-      <span>{metrics.green} Green</span>
-    </span>
-    <span className="inline-flex items-center space-x-1 text-sm text-amber-700">
-      <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-      <span>{metrics.amber} Amber</span>
-    </span>
-    <span className="inline-flex items-center space-x-1 text-sm text-red-700">
-      <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-      <span>{metrics.red} Red</span>
-    </span>
+    <button
+      onClick={() => handleStatusClick("green")}
+      className={`flex items-center px-4 py-2 rounded-lg border shadow-sm transition font-bold focus:outline-none focus:ring-2 ${selectedStatus === "green" ? "ring-green-400 bg-green-200" : "bg-green-100 hover:bg-green-200 border-green-300 text-green-800"}`}
+    >
+      <span className="mr-2 text-lg">🟢</span> {metrics.green} Green
+    </button>
+    <button
+      onClick={() => handleStatusClick("amber")}
+      className={`flex items-center px-4 py-2 rounded-lg border shadow-sm transition font-bold focus:outline-none focus:ring-2 ${selectedStatus === "amber" ? "ring-yellow-400 bg-yellow-200" : "bg-yellow-100 hover:bg-yellow-200 border-yellow-300 text-yellow-800"}`}
+    >
+      <span className="mr-2 text-lg">🟡</span> {metrics.amber} Amber
+    </button>
+    <button
+      onClick={() => handleStatusClick("red")}
+      className={`flex items-center px-4 py-2 rounded-lg border shadow-sm transition font-bold focus:outline-none focus:ring-2 ${selectedStatus === "red" ? "ring-red-400 bg-red-200" : "bg-red-100 hover:bg-red-200 border-red-300 text-red-800"}`}
+    >
+      <span className="mr-2 text-lg">🔴</span> {metrics.red} Red
+    </button>
+  </div>
+  <div className="relative flex items-center space-x-4 mb-4">
+    {/* RAG Buttons (same as before) */}
+    {/* Dropdown */}
+    {selectedStatus && (
+      <div
+        ref={dropdownRef}
+        className={`
+          absolute left-0 mt-2 z-20 w-80
+          bg-white rounded-xl shadow-lg border border-gray-200
+          transition-all duration-300
+          ${selectedStatus ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"}
+        `}
+        style={{ top: "100%" }}
+      >
+        <div className="flex items-center justify-between px-4 py-2 border-b">
+          <span className="font-semibold capitalize text-gray-800">{selectedStatus} Projects</span>
+          <button onClick={() => setSelectedStatus(null)} className="text-xs text-gray-400 hover:text-gray-600">✕</button>
+        </div>
+        <ul className="max-h-64 overflow-y-auto divide-y divide-gray-100">
+          {projects
+            ?.filter(p => (p.ragStatus || "").toLowerCase() === selectedStatus)
+            .map(project => (
+              <li
+                key={project.id}
+                className={
+                  `flex items-center justify-between px-4 py-2 ` +
+                  (selectedStatus === "green"
+                    ? "bg-green-50"
+                    : selectedStatus === "amber"
+                    ? "bg-yellow-50"
+                    : "bg-red-50")
+                }
+              >
+                <span className="truncate text-gray-700">{project.name}</span>
+                <a
+                  href={`/projects/${project.id}`}
+                  className={
+                    `ml-4 px-3 py-1 rounded text-xs font-semibold transition text-white ` +
+                    (selectedStatus === "green"
+                      ? "bg-green-600 hover:bg-green-700"
+                      : selectedStatus === "amber"
+                      ? "bg-yellow-500 hover:bg-yellow-600"
+                      : "bg-red-600 hover:bg-red-700")
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  View
+                </a>
+              </li>
+            ))}
+          {projects?.filter(p => (p.ragStatus || "").toLowerCase() === selectedStatus).length === 0 && (
+            <li className="px-4 py-2 text-gray-400 text-sm">No projects in this status.</li>
+          )}
+        </ul>
+      </div>
+    )}
   </div>
 
   <div className="flex items-center space-x-2">

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from "recharts";
 import { TrendingUp } from "lucide-react";
 import type { Project, WeeklyStatusReport } from "@shared/schema";
 
@@ -58,15 +58,16 @@ export function AnalyticsOverview() {
         {trendData.length > 0 ? (
           <div className="h-96 flex items-center justify-center">
             <ResponsiveContainer width="95%" height="100%">
-              <BarChart data={trendData}>
+              <LineChart data={trendData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="week" stroke="#6b7280" fontSize={14} />
                 <YAxis stroke="#6b7280" fontSize={14} />
                 <Tooltip />
-                <Bar dataKey="Green" stackId="a" fill="#10b981" radius={[0, 0, 8, 8]} />
-                <Bar dataKey="Amber" stackId="a" fill="#f59e0b" />
-                <Bar dataKey="Red" stackId="a" fill="#ef4444" radius={[8, 8, 0, 0]} />
-              </BarChart>
+                <Legend verticalAlign="top" height={36}/>
+                <Line type="monotone" dataKey="Green" stroke="#10b981" strokeWidth={3} dot={{ r: 5 }} activeDot={{ r: 8 }} />
+                <Line type="monotone" dataKey="Amber" stroke="#f59e0b" strokeWidth={3} dot={{ r: 5 }} activeDot={{ r: 8 }} />
+                <Line type="monotone" dataKey="Red" stroke="#ef4444" strokeWidth={3} dot={{ r: 5 }} activeDot={{ r: 8 }} />
+              </LineChart>
             </ResponsiveContainer>
           </div>
         ) : (

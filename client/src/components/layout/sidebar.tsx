@@ -30,18 +30,16 @@ const NAVIGATION_ITEMS = [
 const SidebarHeader = ({ isCollapsed }: { isCollapsed: boolean }) => (
   <div className={cn(
     "flex items-center justify-center border-b border-gray-200 transition-all duration-500 ease-in-out",
-    isCollapsed ? "h-20" : "h-[100px] flex-col pt-2"
+    isCollapsed ? "h-20" : "h-[100px]"
   )}>
     <div className={cn(
-      "transition-all duration-500 ease-in-out",
+      "flex flex-col items-center justify-center gap-1 w-full transition-all duration-500 ease-in-out",
       isCollapsed ? "scale-90" : "scale-100"
     )}>
-      {isCollapsed ? (
-        <BarChart3 className="h-8 w-8 text-blue-600 transition-all duration-500 ease-in-out" />
-      ) : (
+      <BarChart3 className={cn(isCollapsed ? "h-8 w-8" : "h-10 w-10", "text-blue-600 transition-all duration-500 ease-in-out")} />
+      {!isCollapsed && (
         <>
-          <BarChart3 className="h-10 w-10 text-blue-600 transition-all duration-500 ease-in-out" />
-          <h1 className="mt-1 text-xl font-extrabold tracking-tight text-gray-900 transition-all duration-500 ease-in-out">Project Review</h1>
+          <h1 className="text-lg font-extrabold tracking-tight text-gray-900 transition-all duration-500 ease-in-out">Project Review</h1>
           <p className="text-xs font-medium text-gray-500 transition-all duration-500 ease-in-out">Management Tool</p>
         </>
       )}

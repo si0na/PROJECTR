@@ -1,0 +1,1 @@
+import ProjectDetailsPage from "@/pages/projects/[id]";
