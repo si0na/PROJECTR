@@ -108,6 +108,42 @@ export const portfolioAnalysis = pgTable("portfolio_analysis", {
   llmConfigurationId: integer("llm_configuration_id").references(() => llmConfigurations.id),
 });
 
+// External API Response Types for the new data structure
+export const externalProjectSchema = z.object({
+  projectId: z.number(),
+  projectName: z.string(),
+  projectCodeId: z.string().nullable(),
+  projectManagerName: z.string(),
+  account: z.string(),
+  billingModel: z.string(),
+  tower: z.string(),
+  fte: z.string(),
+  wsrPublisYesNo: z.string(),
+  importance: z.string(),
+  isActive: z.boolean(),
+  projectReviews: z.array(z.any()),
+  projectStatuses: z.array(z.object({
+    statusId: z.string(),
+    reportingDate: z.string(),
+    projectImportance: z.string(),
+    deliveryModel: z.string(),
+    clientEscalation: z.boolean(),
+    clientEscalationDetails: z.string().nullable(),
+    ragStatus: z.string(),
+    keyWeeklyUpdates: z.string(),
+    weeklyUpdateColumn: z.string(),
+    llmAiStatus: z.string().nullable(),
+    llmAiAssessmentDescription: z.string().nullable(),
+    planForNextWeek: z.string().nullable(),
+    issuesChallenges: z.string().nullable(),
+    planForGreen: z.string().nullable(),
+    currentSdlcPhase: z.string().nullable(),
+    sqaRemarks: z.string().nullable(),
+  })),
+});
+
+export type ExternalProject = z.infer<typeof externalProjectSchema>;
+
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,

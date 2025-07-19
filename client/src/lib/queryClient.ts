@@ -24,12 +24,36 @@ export async function apiRequest(
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
+
+export async function externalApiRequest(endpoint: string) {
+  const url = `http://34.63.198.88:8080${endpoint}`;
+  console.log('Fetching from external API:', url);
+  
+  const res = await fetch(url, {
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  await throwIfResNotOk(res);
+  const data = await res.json();
+  console.log('External API response:', data);
+  return data;
+}
+
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const keyString = queryKey.join("/") as string;
+    
+    // Use external API for projects endpoint
+    if (keyString === "/api/projects/external") {
+      return externalApiRequest("/api/projects/");
+    }
+    
+    const res = await fetch(keyString, {
       credentials: "include",
     });
 

@@ -27,11 +27,11 @@ import {
   DialogTrigger,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { ProjectCard } from "@/components/dashboard/project-card";
+import { ExternalProjectCard } from "@/components/dashboard/external-project-card";
 import { ProjectForm } from "@/components/forms/project-form";
 import { useAuth } from "@/hooks/use-auth";
 import { USER_ROLES } from "@/lib/constants";
-import type { Project, WeeklyStatusReport, User } from "@shared/schema";
+import type { Project, WeeklyStatusReport, User, ExternalProject } from "@shared/schema";
 
 export default function Projects() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -45,77 +45,58 @@ export default function Projects() {
 
   const { user } = useAuth();
 
-  const { data: projects, isLoading: projectsLoading } = useQuery<Project[]>({
-    queryKey: ["/api/projects"],
+  const { data: projects, isLoading: projectsLoading } = useQuery<ExternalProject[]>({
+    queryKey: ["/api/projects/external"],
   });
-
-  const { data: weeklyReports, isLoading: reportsLoading } = useQuery<
-    WeeklyStatusReport[]
-  >({
-    queryKey: ["/api/weekly-reports"],
-  });
-
-  const { data: users } = useQuery<User[]>({
-    queryKey: ["/api/users"],
-  });
-
-  const getLatestReportForProject = (projectId: number) => {
-    if (!weeklyReports) return undefined;
-
-    const projectReports = weeklyReports.filter(
-      (r) => r.projectId === projectId
-    );
-    return projectReports.sort(
-      (a, b) =>
-        new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()
-    )[0];
-  };
 
   const filteredProjects =
     projects?.filter((project) => {
       // Search filter
       if (
         searchTerm &&
-        !project.name?.toLowerCase().includes(searchTerm.toLowerCase()) &&
-        !project.customer?.toLowerCase().includes(searchTerm.toLowerCase()) &&
-        !project.codeId?.toLowerCase().includes(searchTerm.toLowerCase())
+        !project.projectName?.toLowerCase().includes(searchTerm.toLowerCase()) &&
+        !project.account?.toLowerCase().includes(searchTerm.toLowerCase()) &&
+        !project.projectCodeId?.toLowerCase().includes(searchTerm.toLowerCase())
       ) {
         return false;
       }
 
-      const latestReport = getLatestReportForProject(project.id);
+      // Get latest status from project statuses
+      const latestStatus = project.projectStatuses && project.projectStatuses.length > 0 
+        ? project.projectStatuses.sort((a, b) => new Date(b.reportingDate).getTime() - new Date(a.reportingDate).getTime())[0]
+        : null;
 
-      // Status filter - using project's ragStatus instead of report's
+      // Status filter - using latest status's ragStatus
       if (
         statusFilter !== "all" &&
-        project.ragStatus?.toLowerCase() !== statusFilter
+        latestStatus?.ragStatus?.toLowerCase() !== statusFilter
       ) {
         return false;
       }
 
-      // Importance filter - using project's importance instead of report's
+      // Importance filter - using project's importance
       if (
         importanceFilter !== "all" &&
-        project.projectImportance?.toLowerCase() !== importanceFilter
+        project.importance?.toLowerCase() !== importanceFilter
       ) {
         return false;
       }
 
-      // Manager filter
+      // Manager filter - using project manager name
       if (
         managerFilter !== "all" &&
-        project.projectManagerId?.toString() !== managerFilter
+        project.projectManagerName !== managerFilter
       ) {
         return false;
       }
 
       // Escalation filter
-      if (escalationFilter === "escalated" && !latestReport?.clientEscalation) {
+      if (escalationFilter === "escalated" && !latestStatus?.clientEscalation) {
         return false;
       }
       if (
         escalationFilter === "not_escalated" &&
-        latestReport?.clientEscalation
+        latestStatus?.clientEscalation
       ) {
         return false;
       }
@@ -152,7 +133,7 @@ export default function Projects() {
 
   // Effect to reset page when filters change would go here, but we'll handle it inline
 
-  const isLoading = projectsLoading || reportsLoading;
+  const isLoading = projectsLoading;
   const canCreateProjects =
     user?.role === USER_ROLES.DELIVERY_MANAGER ||
     user?.role === USER_ROLES.ADMIN;
@@ -476,10 +457,9 @@ export default function Projects() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
               {currentProjects.map((project) => (
-                <ProjectCard
-                  key={project.id}
+                <ExternalProjectCard
+                  key={project.projectId}
                   project={project}
-                  latestReport={getLatestReportForProject(project.id)}
                 />
               ))}
             </div>
