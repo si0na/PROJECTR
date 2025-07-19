@@ -62,7 +62,7 @@ export function TechnicalReviewForm({
   const queryClient = useQueryClient();
 
   const { data: projects, isLoading: projectsLoading } = useQuery<Project[]>({
-    queryKey: ["/api/projects"],
+    queryKey: ["/api/projects/external"],
   });
 
   const form = useForm<TechnicalReviewFormDataWithCustom>({

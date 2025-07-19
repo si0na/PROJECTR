@@ -42,74 +42,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Projects endpoints
-  app.get('/api/projects', requireAuth, async (req: any, res) => {
-    try {
-      let projects;
-      if (req.user.role === 'project_manager') {
-        projects = await storage.getProjectsByManager(req.user.id);
-      } else {
-        projects = await storage.getProjects();
-      }
-      
-      // Enrich with project manager details
-      const enrichedProjects = await Promise.all(
-        projects.map(async (project) => {
-          const pm = project.projectManagerId ? await storage.getUser(project.projectManagerId) : null;
-          return { ...project, projectManager: pm };
-        })
-      );
-      
-      res.json(enrichedProjects);
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to fetch projects' });
-    }
-  });
+  // Projects endpoints - REMOVED - Using external API instead
 
-  app.get('/api/projects/:id', requireAuth, async (req, res) => {
+  // Proxy endpoint for external API to avoid CORS issues
+  app.get('/api/projects', requireAuth, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const project = await storage.getProject(id);
-      if (!project) {
-        return res.status(404).json({ message: 'Project not found' });
+      console.log('Proxying request to external API...');
+      const response = await fetch('http://34.63.198.88:8080/api/projects/');
+      
+      if (!response.ok) {
+        throw new Error(`External API error: ${response.status} ${response.statusText}`);
       }
       
-      const pm = project.projectManagerId ? await storage.getUser(project.projectManagerId) : null;
-      res.json({ ...project, projectManager: pm });
+      const data = await response.json();
+      console.log(`External API returned ${Array.isArray(data) ? data.length : 'non-array'} data`);
+      res.json(data);
     } catch (error) {
-      res.status(500).json({ message: 'Failed to fetch project' });
-    }
-  });
-
-  app.post('/api/projects', requireAuth, requireRole(['delivery_manager', 'admin']), async (req, res) => {
-    try {
-      const projectData = insertProjectSchema.parse(req.body);
-      const project = await storage.createProject(projectData);
-      res.status(201).json(project);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: 'Invalid project data', errors: error.errors });
-      }
-      res.status(500).json({ message: 'Failed to create project' });
-    }
-  });
-
-  app.put('/api/projects/:id', requireAuth, requireRole(['delivery_manager', 'admin']), async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const projectData = insertProjectSchema.partial().parse(req.body);
-      const project = await storage.updateProject(id, projectData);
-      
-      if (!project) {
-        return res.status(404).json({ message: 'Project not found' });
-      }
-      
-      res.json(project);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: 'Invalid project data', errors: error.errors });
-      }
-      res.status(500).json({ message: 'Failed to update project' });
+      console.error('Proxy error:', error);
+      res.status(500).json({ message: 'Failed to fetch projects from external API', error: error.message });
     }
   });
 

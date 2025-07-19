@@ -30,7 +30,7 @@ export function AIAssessmentHeader() {
 const primaryRecommendation = analysis?.reason ? getPrimaryRecommendation(analysis.reason) : "";
 
   const { data: projects } = useQuery<Project[]>({
-    queryKey: ["/api/projects"],
+    queryKey: ["/api/projects/external"],
   });
 
   const getStatusColor = (status: string) => {

@@ -93,10 +93,8 @@ export function ProjectForm({ onSuccess, onCancel }: ProjectFormProps) {
         projectTags: tags,
       };
 
-      const response = await apiRequest("/api/projects", {
-        method: "POST",
-        body: JSON.stringify(requestData),
-      });
+      // External API doesn't support creating projects - this would need backend implementation
+      throw new Error("Project creation not supported with external API");
 
       if (!response.ok) {
         throw new Error("Failed to create project");
@@ -105,7 +103,7 @@ export function ProjectForm({ onSuccess, onCancel }: ProjectFormProps) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects/external"] });
       toast({
         title: "Success",
         description: "Project created successfully",

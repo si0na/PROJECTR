@@ -77,7 +77,8 @@ export default function WeeklyReports() {
   });
 
   const { data: projects } = useQuery<Project[]>({
-    queryKey: ["/api/projects"],
+    queryKey: ["/api/projects/external"],
+    
   });
 
   const getRagStatusStyles = (status: string) => {

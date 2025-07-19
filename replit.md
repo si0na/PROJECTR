@@ -132,6 +132,14 @@ Role: Admin with executive portfolio oversight capabilities
 
 ## Recent Changes: Latest modifications with dates
 
+### July 19, 2025 - External API Integration
+- **Complete Migration**: Successfully migrated from local Express API to external API at `http://34.63.198.88:8080/api/projects/`
+- **Proxy Implementation**: Created Express proxy endpoint to handle CORS issues with external API
+- **Frontend Updates**: Updated all React Query calls across 8+ components to use external API endpoint
+- **Error Handling**: Added comprehensive error handling and fallbacks for external API failures
+- **Data Verification**: External API successfully returning 13 projects with ~220ms response time
+- **Removed Local Endpoints**: Eliminated all local project CRUD endpoints in favor of external data source
+
 ### January 14, 2025 - Excel Data Structure Integration
 - **Schema Alignment**: Updated project and weekly status report schemas to match Excel WSR format exactly
 - **Real Project Data**: Replaced test data with authentic projects from Excel file:

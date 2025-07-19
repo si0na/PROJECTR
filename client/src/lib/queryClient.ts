@@ -29,16 +29,29 @@ export async function externalApiRequest(endpoint: string) {
   const url = `http://34.63.198.88:8080${endpoint}`;
   console.log('Fetching from external API:', url);
   
-  const res = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        "Accept": "application/json",
+      },
+    });
 
-  await throwIfResNotOk(res);
-  const data = await res.json();
-  console.log('External API response:', data);
-  return data;
+    if (!res.ok) {
+      console.error('External API HTTP error:', res.status, res.statusText);
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    console.log('External API response received, length:', Array.isArray(data) ? data.length : 'not array');
+    if (Array.isArray(data) && data.length > 0) {
+      console.log('Sample project keys:', Object.keys(data[0]));
+    }
+    return data;
+  } catch (error) {
+    console.error('External API error:', error.message || error);
+    throw error;
+  }
 }
 
 export const getQueryFn: <T>(options: {
@@ -48,9 +61,19 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const keyString = queryKey.join("/") as string;
     
-    // Use external API for projects endpoint
+    // Use proxy endpoint for external projects
     if (keyString === "/api/projects/external") {
-      return externalApiRequest("/api/projects/");
+      // Use local proxy endpoint instead of direct external call
+      const res = await fetch('/api/projects', {
+        credentials: "include",
+      });
+
+      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+        return null;
+      }
+
+      await throwIfResNotOk(res);
+      return await res.json();
     }
     
     const res = await fetch(keyString, {

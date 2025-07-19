@@ -119,7 +119,7 @@ export default function Analytics() {
   const [timeRange, setTimeRange] = useState("3months");
 
   const { data: projects } = useQuery<Project[]>({
-    queryKey: ["/api/projects"],
+    queryKey: ["/api/projects/external"],
   });
 
   const { data: weeklyReports } = useQuery<WeeklyReport[]>({
