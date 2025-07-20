@@ -9,14 +9,12 @@ import {
   FolderOpen,
   LogOut,
   TrendingUp,
-  X,
 } from "lucide-react";
 
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-// --- Constants for better organization ---
 const NAVIGATION_ITEMS = [
   { name: "Dashboard", href: "/", icon: BarChart3, roles: ["project_manager", "delivery_manager", "admin"] },
   { name: "Projects", href: "/projects", icon: FolderOpen, roles: ["project_manager", "delivery_manager", "admin"] },
@@ -26,11 +24,10 @@ const NAVIGATION_ITEMS = [
   { name: "LLM Configuration", href: "/llm-config", icon: Bot, roles: ["delivery_manager", "admin"] },
 ];
 
-// --- Sub-component: Sidebar Header ---
 const SidebarHeader = ({ isCollapsed }: { isCollapsed: boolean }) => (
   <div className={cn(
     "flex items-center justify-center border-b border-gray-200 transition-all duration-500 ease-in-out",
-    isCollapsed ? "h-20" : "h-[100px]"
+    isCollapsed ? "h-20 px-2" : "h-[100px] px-4"
   )}>
     <div className={cn(
       "flex flex-col items-center justify-center gap-1 w-full transition-all duration-500 ease-in-out",
@@ -47,7 +44,6 @@ const SidebarHeader = ({ isCollapsed }: { isCollapsed: boolean }) => (
   </div>
 );
 
-// --- Sub-component: Navigation Link ---
 const NavLink = ({ item, isCollapsed, location, onClose }: any) => {
   const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
 
@@ -59,7 +55,7 @@ const NavLink = ({ item, isCollapsed, location, onClose }: any) => {
           isActive
             ? "bg-blue-100 text-blue-700 shadow-sm"
             : "text-gray-600 hover:bg-blue-50 hover:text-blue-700 hover:shadow-sm",
-          isCollapsed ? "justify-center" : "px-4"
+          isCollapsed ? "justify-center px-2" : "px-4"
         )}
         title={isCollapsed ? item.name : undefined}
       >
@@ -80,7 +76,6 @@ const NavLink = ({ item, isCollapsed, location, onClose }: any) => {
   );
 };
 
-// --- Main Sidebar Component ---
 interface SidebarProps {
   isOpen: boolean;
   isCollapsed: boolean;
@@ -97,52 +92,45 @@ export function Sidebar({ isOpen, isCollapsed, onClose, toggleCollapse }: Sideba
 
   return (
     <>
-      {/* Overlay for mobile view */}
-      <div
-        className={cn(
-          "fixed inset-0 z-30 bg-black/30 transition-opacity duration-300 ease-in-out lg:hidden",
-          isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-        )}
-        onClick={onClose}
-      />
+      {/* Overlay for mobile view - clicking anywhere outside closes sidebar */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/30 lg:hidden"
+          onClick={onClose}
+        />
+      )}
 
       {/* Sidebar Container */}
       <aside
         className={cn(
-          "fixed top-0 left-0 z-40 flex h-screen flex-col bg-gradient-to-b from-blue-50 via-white to-blue-100 shadow-xl transition-all duration-500 ease-in-out lg:relative lg:z-auto lg:translate-x-0",
-          isCollapsed ? "w-20" : "w-64",
-          isOpen ? "translate-x-0" : "-translate-x-full"
+          "fixed top-16 left-0 z-40 flex h-[calc(100vh-4rem)] w-64 flex-col bg-gradient-to-b from-blue-50 via-white to-blue-100 shadow-xl transition-transform duration-300 ease-in-out",
+          "lg:relative lg:top-0 lg:z-auto lg:h-screen",
+          isCollapsed ? "lg:w-20" : "lg:w-64",
+          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
         {/* Header */}
         <SidebarHeader isCollapsed={isCollapsed} />
 
-        {/* Action Buttons (Close/Collapse) */}
-        <div className="absolute top-3 right-[-14px] z-50">
+        {/* Collapse Button - Only visible on desktop */}
+        <div className="absolute top-3 right-[-14px] z-50 hidden lg:block">
           <Button
             variant="ghost"
             size="icon"
-            className="hidden lg:flex justify-center items-center bg-white hover:bg-blue-100 rounded-full border border-gray-200 shadow-sm transition-all duration-300 ease-in-out hover:scale-110"
+            className="flex justify-center items-center bg-white hover:bg-blue-100 rounded-full border border-gray-200 shadow-sm transition-all duration-300 ease-in-out hover:scale-110"
             onClick={toggleCollapse}
             aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            <div className="transition-transform duration-300 ease-in-out">
-              {isCollapsed ? <ChevronRight className="h-5 w-5 text-blue-500" /> : <ChevronLeft className="h-5 w-5 text-blue-500" />}
-            </div>
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="lg:hidden flex justify-center items-center bg-white hover:bg-blue-100 rounded-full border border-gray-200 shadow-sm transition-all duration-300 ease-in-out hover:scale-110"
-            aria-label="Close sidebar"
-          >
-            <X className="h-5 w-5 text-blue-500" />
+            {isCollapsed ? (
+              <ChevronRight className="h-5 w-5 text-blue-500" />
+            ) : (
+              <ChevronLeft className="h-5 w-5 text-blue-500" />
+            )}
           </Button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-2 overflow-y-auto px-3 py-4">
+        <nav className="flex-1 space-y-2 overflow-y-auto px-2 py-4 lg:px-3">
           {filteredNavigation.map((item) => (
             <NavLink
               key={item.name}
@@ -160,7 +148,7 @@ export function Sidebar({ isOpen, isCollapsed, onClose, toggleCollapse }: Sideba
             <div
               className={cn(
                 "group flex cursor-pointer items-center gap-3 rounded-xl p-2.5 font-semibold text-red-500 hover:bg-red-50 transition-all duration-300 ease-in-out",
-                isCollapsed && "justify-center"
+                isCollapsed ? "justify-center px-2" : "px-4"
               )}
               title={isCollapsed ? "Sign Out" : undefined}
             >

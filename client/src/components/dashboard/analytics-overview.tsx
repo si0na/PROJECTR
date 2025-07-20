@@ -9,12 +9,14 @@ interface Assessment {
   greenProjects: number;
   amberProjects: number;
   redProjects: number;
+  errorProjects: number; // Added error projects count
   totalProjects: number;
   trends: {
     assessmentDate: string;
     green: number;
     amber: number;
     red: number;
+    error: number; // Added error count in trends
     total: number;
   }[];
 }
@@ -25,6 +27,14 @@ interface TrendData {
   Amber: number;
   Red: number;
   total: number;
+}
+
+interface RAGStatus {
+  greenPercentage: number;
+  amberPercentage: number;
+  redPercentage: number;
+  totalValidProjects: number;
+  totalProjects: number;
 }
 
 export function AnalyticsOverview() {
@@ -46,7 +56,7 @@ export function AnalyticsOverview() {
         Green: trend.green,
         Amber: trend.amber,
         Red: trend.red,
-        total: trend.total
+        total: trend.total - (trend.error || 0) // Exclude error projects from total
       })) || []
     );
 
@@ -57,7 +67,7 @@ export function AnalyticsOverview() {
         Green: assessment.greenProjects,
         Amber: assessment.amberProjects,
         Red: assessment.redProjects,
-        total: assessment.totalProjects
+        total: assessment.totalProjects - (assessment.errorProjects || 0)
       }));
     }
 
@@ -76,8 +86,30 @@ export function AnalyticsOverview() {
     );
   };
 
+  // Calculate RAG status for assessment ID 5 excluding error projects
+  const getAssessment5RAGStatus = (): RAGStatus | null => {
+    if (!assessments) return null;
+
+    const assessment5 = assessments.find(a => a.assessmentId === 5);
+    if (!assessment5) return null;
+
+    // Exclude error projects from total
+    const totalValidProjects = assessment5.totalProjects - (assessment5.errorProjects || 0);
+    
+    if (totalValidProjects <= 0) return null;
+
+    return {
+      greenPercentage: (assessment5.greenProjects / totalValidProjects) * 100,
+      amberPercentage: (assessment5.amberProjects / totalValidProjects) * 100,
+      redPercentage: (assessment5.redProjects / totalValidProjects) * 100,
+      totalValidProjects: totalValidProjects,
+      totalProjects: assessment5.totalProjects
+    };
+  };
+
   const trendData = getTrendData();
   const totalProjects = assessments?.[0]?.totalProjects || 0;
+  const ragStatus = getAssessment5RAGStatus();
 
   if (isLoading) {
     return (
@@ -181,6 +213,35 @@ export function AnalyticsOverview() {
             <p>No project status data available</p>
           </div>
         )}
+
+        {/* Assessment ID 5 RAG Status Card */}
+        {ragStatus && (
+          <div className="mt-8 p-6 bg-white rounded-xl border border-gray-200 shadow-sm">
+            <h4 className="font-medium text-gray-900 mb-4 text-lg">Assessment ID 5 Status Breakdown</h4>
+            <p className="text-sm text-gray-600 mb-4">
+              Showing valid projects only (excluding error status). Based on {ragStatus.totalValidProjects} projects (out of {ragStatus.totalProjects} total).
+            </p>
+            
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center p-4 bg-green-50 rounded-lg border border-green-100">
+                <p className="text-3xl font-bold text-green-600">{ragStatus.greenPercentage.toFixed(1)}%</p>
+                <p className="text-sm font-medium text-green-800 mt-1">Green</p>
+                <p className="text-xs text-green-600 mt-1">({Math.round(ragStatus.greenPercentage * ragStatus.totalValidProjects / 100)} projects)</p>
+              </div>
+              <div className="text-center p-4 bg-amber-50 rounded-lg border border-amber-100">
+                <p className="text-3xl font-bold text-amber-600">{ragStatus.amberPercentage.toFixed(1)}%</p>
+                <p className="text-sm font-medium text-amber-800 mt-1">Amber</p>
+                <p className="text-xs text-amber-600 mt-1">({Math.round(ragStatus.amberPercentage * ragStatus.totalValidProjects / 100)} projects)</p>
+              </div>
+              <div className="text-center p-4 bg-red-50 rounded-lg border border-red-100">
+                <p className="text-3xl font-bold text-red-600">{ragStatus.redPercentage.toFixed(1)}%</p>
+                <p className="text-sm font-medium text-red-800 mt-1">Red</p>
+                <p className="text-xs text-red-600 mt-1">({Math.round(ragStatus.redPercentage * ragStatus.totalValidProjects / 100)} projects)</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="mt-4 text-sm text-gray-600">
           <p>Tracking RAG status across {totalProjects} projects using assessment data.</p>
           {assessments && assessments.length > 0 && (
