@@ -1,21 +1,25 @@
 import { useQuery } from "@tanstack/react-query";
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from "recharts";
 import { TrendingUp } from "lucide-react";
+import { externalApiRequest } from "@/lib/queryClient";
 
-interface Project {
-  projectId: number;
-  projectName: string;
-  projectStatuses?: ProjectStatus[];
+interface Assessment {
+  assessmentId: number;
+  assessmentDate: string;
+  greenProjects: number;
+  amberProjects: number;
+  redProjects: number;
+  totalProjects: number;
+  trends: {
+    assessmentDate: string;
+    green: number;
+    amber: number;
+    red: number;
+    total: number;
+  }[];
 }
 
-interface ProjectStatus {
-  statusId: string;
-  reportingDate: string;
-  ragStatus: 'Green' | 'Amber' | 'Yellow' | 'Red';
-}
-
-interface WeeklyTrendData {
-  week: string;
+interface TrendData {
   date: string;
   Green: number;
   Amber: number;
@@ -24,79 +28,80 @@ interface WeeklyTrendData {
 }
 
 export function AnalyticsOverview() {
-  const { data: projects } = useQuery<Project[]>({
-    queryKey: ['/api/projects/external'],
+  const { data: assessments, isLoading, error } = useQuery<Assessment[]>({
+    queryKey: ['organizational-assessments'],
+    queryFn: () => externalApiRequest('/api/organizational-assessments/dashboard'),
   });
-   console.log('Fetched projects:', projects);
 
-  // Calculate weekly trend from project statuses
-  const getWeeklyTrend = (): WeeklyTrendData[] => {
-    if (!projects) return [];
+  console.log('Fetched assessments:', assessments);
 
-    // First, organize all projects with their latest status per week
-    const weeklyGroups: Record<string, {
-      projects: Record<number, 'Green' | 'Amber' | 'Red'> // projectId → status
-    }> = {};
+  // Transform assessment data into chart format
+  const getTrendData = (): TrendData[] => {
+    if (!assessments) return [];
 
-    projects.forEach(project => {
-      if (!project.projectStatuses || project.projectStatuses.length === 0) return;
+    // Collect all trend entries from all assessments
+    const allTrends = assessments.flatMap(assessment => 
+      assessment.trends?.map(trend => ({
+        date: trend.assessmentDate,
+        Green: trend.green,
+        Amber: trend.amber,
+        Red: trend.red,
+        total: trend.total
+      })) || []
+    );
 
-      // Sort statuses by date (newest first)
-      const sortedStatuses = [...project.projectStatuses].sort((a, b) => 
-        new Date(b.reportingDate).getTime() - new Date(a.reportingDate).getTime()
-      );
-
-      // Group by week of the year
-      sortedStatuses.forEach(status => {
-        const statusDate = new Date(status.reportingDate);
-        const weekNumber = getWeekNumber(statusDate);
-        const weekKey = `${statusDate.getFullYear()}-W${weekNumber}`;
-
-        if (!weeklyGroups[weekKey]) {
-          weeklyGroups[weekKey] = { projects: {} };
-        }
-
-        // Only keep the most recent status for each project in each week
-        if (!weeklyGroups[weekKey].projects[project.projectId]) {
-          weeklyGroups[weekKey].projects[project.projectId] = 
-            status.ragStatus === 'Yellow' ? 'Amber' : status.ragStatus;
-        }
-      });
-    });
-
-    // Helper function to get ISO week number
-    function getWeekNumber(date: Date): number {
-      const d = new Date(date);
-      d.setHours(0, 0, 0, 0);
-      d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
-      const week1 = new Date(d.getFullYear(), 0, 4);
-      return 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+    // If no trends data, use the main assessment data points
+    if (allTrends.length === 0) {
+      return assessments.map(assessment => ({
+        date: assessment.assessmentDate,
+        Green: assessment.greenProjects,
+        Amber: assessment.amberProjects,
+        Red: assessment.redProjects,
+        total: assessment.totalProjects
+      }));
     }
 
-    // Convert to chart data format (last 8 weeks)
-    const sortedWeeks = Object.keys(weeklyGroups).sort();
-    return sortedWeeks.slice(-8).map((weekKey, index) => {
-      const weekData = weeklyGroups[weekKey];
-      const counts = { Green: 0, Amber: 0, Red: 0 };
+    // Remove duplicates by keeping the most recent entry for each date
+    const uniqueTrends = allTrends.reduce((acc, current) => {
+      const existing = acc.find(item => item.date === current.date);
+      if (!existing) {
+        acc.push(current);
+      }
+      return acc;
+    }, [] as TrendData[]);
 
-      Object.values(weekData.projects).forEach(status => {
-        counts[status]++;
-      });
-
-      return {
-        week: `W${index + 1}`,
-        date: weekKey,
-        ...counts,
-        total: Object.keys(weekData.projects).length
-      };
-    });
+    // Sort by date
+    return uniqueTrends.sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
   };
 
-  const trendData = getWeeklyTrend();
+  const trendData = getTrendData();
+  const totalProjects = assessments?.[0]?.totalProjects || 0;
 
-  // Debug log to verify counts
-  console.log('Total projects:', projects?.length);
-  console.log('Weekly trend data:', trendData);
+  if (isLoading) {
+    return (
+      <div className="w-full">
+        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl border border-green-100 shadow-lg p-10 my-4">
+          <div className="h-96 flex items-center justify-center">
+            <p>Loading project health data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full">
+        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl border border-green-100 shadow-lg p-10 my-4">
+          <div className="h-96 flex items-center justify-center text-red-500">
+            <p>Error loading project health data</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
@@ -105,7 +110,7 @@ export function AnalyticsOverview() {
           <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
             <TrendingUp className="h-5 w-5 text-green-600" />
           </div>
-          <h3 className="text-2xl font-bold text-gray-900 tracking-tight">Project Health Trends (Last 8 Weeks)</h3>
+          <h3 className="text-2xl font-bold text-gray-900 tracking-tight">Project Health Trends</h3>
         </div>
         {trendData.length > 0 ? (
           <div className="h-96 flex items-center justify-center">
@@ -113,23 +118,34 @@ export function AnalyticsOverview() {
               <LineChart data={trendData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis 
-                  dataKey="week" 
-                  stroke="#6b7280" 
-                  fontSize={14} 
-                  label={{ value: 'Week', position: 'insideBottomRight', offset: -5 }}
+                  dataKey="date"
+                  stroke="#6b7280"
+                  fontSize={12}
+                  angle={-45}
+                  textAnchor="end"
+                  height={70}
+                  label={{ value: '', position: 'insideBottomRight', offset: -5 }}
                 />
                 <YAxis 
                   stroke="#6b7280" 
                   fontSize={14} 
                   label={{ value: '# Projects', angle: -90, position: 'insideLeft' }}
-                  domain={[0, projects?.length || 10]} // Set Y-axis max to project count
+                  domain={[0, totalProjects || 10]}
                 />
                 <Tooltip 
-                  contentStyle={{ borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+                  contentStyle={{ 
+                    borderRadius: '8px', 
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                    backgroundColor: '#fff'
+                  }}
                   formatter={(value: number, name: string) => [`${value} projects`, name]} 
-                  labelFormatter={(label: string) => `Week ${label.replace('W', '')}`}
+                  labelFormatter={(label: string) => `Date: ${label}`}
                 />
-                <Legend verticalAlign="top" height={36}/>
+                <Legend 
+                  verticalAlign="top" 
+                  height={36}
+                  wrapperStyle={{ paddingBottom: '20px' }}
+                />
                 <Line 
                   type="monotone" 
                   dataKey="Green" 
@@ -166,7 +182,12 @@ export function AnalyticsOverview() {
           </div>
         )}
         <div className="mt-4 text-sm text-gray-600">
-          <p>Tracking RAG status across {projects?.length || 0} projects using their latest weekly status reports.</p>
+          <p>Tracking RAG status across {totalProjects} projects using assessment data.</p>
+          {assessments && assessments.length > 0 && (
+            <p className="mt-1">
+              Latest assessment: {new Date(assessments[0].assessmentDate).toLocaleDateString()}
+            </p>
+          )}
         </div>
       </div>
     </div>

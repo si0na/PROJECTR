@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useLocation, useRoute } from "wouter";
-
+import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
   Plus,
@@ -37,8 +36,35 @@ import { ProjectForm } from "@/components/forms/project-form";
 import { useAuth } from "@/hooks/use-auth";
 import { USER_ROLES } from "@/lib/constants";
 import type { ExternalProject } from "@shared/schema";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+
 function ExternalProjectCard({ project }: { project: ExternalProject }) {
-   const [, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
+  const [showBulkUpdateModal, setShowBulkUpdateModal] = useState(false);
+
+  // New state for bulk updates
+  const [bulkUpdates, setBulkUpdates] = useState<Array<{
+    reportingDate: string;
+    ragStatus: string;
+    weeklyUpdateColumn: string;
+    keyWeeklyUpdates: string;
+    deliveryModel?: string;
+    clientEscalation?: boolean;
+    planForNextWeek?: string;
+    currentSdlcPhase?: string;
+    issuesChallenges?: string;
+  }>>([{
+    reportingDate: new Date().toISOString().split('T')[0],
+    ragStatus: '',
+    weeklyUpdateColumn: '',
+    keyWeeklyUpdates: '',
+    deliveryModel: '',
+    clientEscalation: false,
+    planForNextWeek: '',
+    currentSdlcPhase: '',
+    issuesChallenges: ''
+  }]);
+
   // Get the latest status
   const latestStatus = project.projectStatuses?.length > 0
     ? [...project.projectStatuses].sort((a, b) => 
@@ -78,6 +104,35 @@ function ExternalProjectCard({ project }: { project: ExternalProject }) {
     return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
   };
 
+  const addBulkUpdateEntry = () => {
+    setBulkUpdates([...bulkUpdates, {
+      reportingDate: new Date().toISOString().split('T')[0],
+      ragStatus: '',
+      weeklyUpdateColumn: '',
+      keyWeeklyUpdates: '',
+      deliveryModel: '',
+      clientEscalation: false,
+      planForNextWeek: '',
+      currentSdlcPhase: '',
+      issuesChallenges: ''
+    }]);
+  };
+
+  const removeBulkUpdateEntry = (index: number) => {
+    const newUpdates = [...bulkUpdates];
+    newUpdates.splice(index, 1);
+    setBulkUpdates(newUpdates);
+  };
+
+  const handleBulkUpdateFieldChange = (index: number, field: string, value: string | boolean) => {
+    const newUpdates = [...bulkUpdates];
+    newUpdates[index] = {
+      ...newUpdates[index],
+      [field]: value
+    };
+    setBulkUpdates(newUpdates);
+  };
+
   return (
     <Card className="hover:shadow-lg transition-shadow h-full flex flex-col">
       <CardHeader className="pb-3">
@@ -108,7 +163,7 @@ function ExternalProjectCard({ project }: { project: ExternalProject }) {
 
       <CardContent className="flex-grow space-y-4">
         {/* AI Assessment at the top */}
-        {latestStatus?.llmAiAssessmentDescription && (
+        {latestStatus?.llmAiAssessmentDescription ? (
           <div className={`p-3 rounded-lg border ${getStatusColor(latestStatus.ragStatus)}`}>
             <div className="flex items-start">
               {latestStatus.ragStatus === 'Red' ? (
@@ -120,6 +175,13 @@ function ExternalProjectCard({ project }: { project: ExternalProject }) {
                 <p className="text-sm font-medium mb-1">AI Assessment</p>
                 <p className="text-sm">{truncateText(latestStatus.llmAiAssessmentDescription)}</p>
               </div>
+            </div>
+          </div>
+        ) : (
+          <div className="p-3 rounded-lg border border-gray-200 bg-gray-50">
+            <div className="flex items-center text-gray-500">
+              <AlertTriangle className="h-4 w-4 mr-2 flex-shrink-0" />
+              <p className="text-sm">No AI assessment available</p>
             </div>
           </div>
         )}
@@ -139,7 +201,9 @@ function ExternalProjectCard({ project }: { project: ExternalProject }) {
             <Calendar className="h-4 w-4 mt-0.5 mr-2 flex-shrink-0 text-blue-600" />
             <div>
               <p className="text-sm text-gray-600">
-                Delivery Model: <span className="font-bold text-gray-900">{latestStatus?.deliveryModel || 'N/A'}</span>
+                Delivery Model: <span className="font-bold text-gray-900">
+                  {latestStatus?.deliveryModel || project.billingModel || 'N/A'}
+                </span>
               </p>
             </div>
           </div>
@@ -149,7 +213,7 @@ function ExternalProjectCard({ project }: { project: ExternalProject }) {
             <div>
               <p className="text-sm text-gray-600">
                 Escalation: <span className={`font-bold ${latestStatus?.clientEscalation ? 'text-red-600' : 'text-green-600'}`}>
-                  {latestStatus?.clientEscalation ? 'Yes' : 'No'}
+                  {latestStatus ? (latestStatus.clientEscalation ? 'Yes' : 'No') : 'No data'}
                 </span>
               </p>
               {latestStatus?.clientEscalationDetails && (
@@ -190,7 +254,13 @@ function ExternalProjectCard({ project }: { project: ExternalProject }) {
         </div>
       </CardContent>
 
-      <CardFooter className="flex justify-end pt-4">
+      <CardFooter className="flex justify-between pt-4">
+        <Button 
+          variant="outline"
+          onClick={() => setShowBulkUpdateModal(true)}
+        >
+          Bulk Update
+        </Button>
         <Button 
           className="bg-blue-600 hover:bg-blue-700 text-white"
           onClick={() => setLocation(`/projects/${project.projectId}`)}
@@ -199,6 +269,183 @@ function ExternalProjectCard({ project }: { project: ExternalProject }) {
           <ChevronRight className="h-4 w-4 ml-2" />
         </Button>
       </CardFooter>
+
+      {/* Bulk Update Modal */}
+      <Dialog open={showBulkUpdateModal} onOpenChange={setShowBulkUpdateModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Bulk Status Updates for {project.projectName}</DialogTitle>
+            <DialogDescription>
+              Add multiple status updates at once
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="space-y-6">
+              {bulkUpdates.map((update, index) => (
+                <div key={index} className="border rounded-lg p-4 relative">
+                  {bulkUpdates.length > 1 && (
+                    <button 
+                      onClick={() => removeBulkUpdateEntry(index)}
+                      className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-100"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  )}
+                  <h3 className="font-medium mb-3">Update {index + 1}</h3>
+                  
+                  <Tabs defaultValue="basic">
+                    <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="basic">Basic Info</TabsTrigger>
+                      <TabsTrigger value="updates">Updates</TabsTrigger>
+                      <TabsTrigger value="details">Details</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="basic">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Reporting Date</label>
+                          <Input 
+                            type="date" 
+                            value={update.reportingDate}
+                            onChange={(e) => handleBulkUpdateFieldChange(index, 'reportingDate', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">RAG Status</label>
+                          <Select
+                            value={update.ragStatus}
+                            onValueChange={(value) => handleBulkUpdateFieldChange(index, 'ragStatus', value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Green">Green</SelectItem>
+                              <SelectItem value="Amber">Amber</SelectItem>
+                              <SelectItem value="Red">Red</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Delivery Model</label>
+                          <Input 
+                            placeholder="Enter delivery model"
+                            value={update.deliveryModel || ''}
+                            onChange={(e) => handleBulkUpdateFieldChange(index, 'deliveryModel', e.target.value)}
+                          />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input 
+                            type="checkbox" 
+                            id={`clientEscalation-${index}`}
+                            checked={update.clientEscalation || false}
+                            onChange={(e) => handleBulkUpdateFieldChange(index, 'clientEscalation', e.target.checked)}
+                          />
+                          <label htmlFor={`clientEscalation-${index}`} className="text-sm font-medium">
+                            Client Escalation
+                          </label>
+                        </div>
+                      </div>
+                    </TabsContent>
+                    
+                    <TabsContent value="updates">
+                      <div className="space-y-4 mt-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Weekly Update Column</label>
+                          <Input 
+                            placeholder="Enter weekly update column"
+                            value={update.weeklyUpdateColumn || ''}
+                            onChange={(e) => handleBulkUpdateFieldChange(index, 'weeklyUpdateColumn', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Key Weekly Updates</label>
+                          <Input 
+                            placeholder="Enter key updates for this week"
+                            value={update.keyWeeklyUpdates || ''}
+                            onChange={(e) => handleBulkUpdateFieldChange(index, 'keyWeeklyUpdates', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Plan for Next Week</label>
+                          <Input 
+                            placeholder="Enter plan for next week"
+                            value={update.planForNextWeek || ''}
+                            onChange={(e) => handleBulkUpdateFieldChange(index, 'planForNextWeek', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </TabsContent>
+                    
+                    <TabsContent value="details">
+                      <div className="space-y-4 mt-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Current SDLC Phase</label>
+                          <Input 
+                            placeholder="Enter current SDLC phase"
+                            value={update.currentSdlcPhase || ''}
+                            onChange={(e) => handleBulkUpdateFieldChange(index, 'currentSdlcPhase', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Issues/Challenges</label>
+                          <Input 
+                            placeholder="Enter current issues or challenges"
+                            value={update.issuesChallenges || ''}
+                            onChange={(e) => handleBulkUpdateFieldChange(index, 'issuesChallenges', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              ))}
+              
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={addBulkUpdateEntry}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Another Update
+              </Button>
+              
+              <div className="flex justify-end gap-2 pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowBulkUpdateModal(false);
+                    setBulkUpdates([{
+                      reportingDate: new Date().toISOString().split('T')[0],
+                      ragStatus: '',
+                      weeklyUpdateColumn: '',
+                      keyWeeklyUpdates: '',
+                      deliveryModel: '',
+                      clientEscalation: false,
+                      planForNextWeek: '',
+                      currentSdlcPhase: '',
+                      issuesChallenges: ''
+                    }]);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    // Handle bulk update submission here
+                    console.log('Submitting bulk updates:', bulkUpdates);
+                    setShowBulkUpdateModal(false);
+                  }}
+                >
+                  Save All Updates
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
@@ -214,25 +461,12 @@ export default function Projects() {
   const [itemsPerPage] = useState(12);
 
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
 
   const { data: projects, isLoading: projectsLoading } = useQuery<ExternalProject[]>({
     queryKey: ["/api/projects/external"],
   });
-const [projectIdSearch, setProjectIdSearch] = useState("");
-const [selectedProject, setSelectedProject] = useState<ExternalProject | null>(null);
-  const handleProjectIdSearch = () => {
-  if (!projectIdSearch.trim()) return;
-  
-  const match = projects?.find(
-    (p) => p.projectId.toString() === projectIdSearch.trim()
-  );
-  
-  if (match) {
-    setSelectedProject(match);
-  } else {
-    alert("Project not found. Please check the ID and try again.");
-  }
-};
+
   const filteredProjects = projects?.filter((project) => {
     // Search filter
     if (
@@ -334,12 +568,6 @@ const [selectedProject, setSelectedProject] = useState<ExternalProject | null>(n
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>Create New Project</DialogTitle>
-                      <DialogDescription>
-                        Fill in the project details below. Fields marked with * are required.
-                      </DialogDescription>
-                    </DialogHeader>
                     <ProjectForm
                       onSuccess={() => setCreateProjectOpen(false)}
                       onCancel={() => setCreateProjectOpen(false)}
@@ -492,6 +720,8 @@ const [selectedProject, setSelectedProject] = useState<ExternalProject | null>(n
                     setSearchTerm("");
                     setStatusFilter("all");
                     setImportanceFilter("all");
+                    setManagerFilter("all");
+                    setEscalationFilter("all");
                     setCurrentPage(1);
                   }}
                 >
@@ -500,54 +730,82 @@ const [selectedProject, setSelectedProject] = useState<ExternalProject | null>(n
               )}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {currentProjects.map((project) => (
-                <ExternalProjectCard key={project.projectId} project={project} />
-              ))}
-            </div>
-
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center space-x-2 mt-8">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-2" />
-                  Previous
-                </Button>
-
-                <div className="flex items-center space-x-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1)
-                    .filter((page) => page === 1 || page === totalPages || (page >= currentPage - 2 && page <= currentPage + 2))
-                    .map((page, index, array) => (
-                      <div key={page} className="flex items-center">
-                        {index > 0 && page - array[index - 1] > 1 && (
-                          <span className="px-2 text-gray-400">...</span>
-                        )}
-                        <Button
-                          variant={currentPage === page ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setCurrentPage(page)}
-                          className="min-w-[2.5rem]"
-                        >
-                          {page}
-                        </Button>
-                      </div>
-                    ))}
+            {filteredProjects.length === 0 ? (
+              <div className="bg-white rounded-lg border border-dashed border-gray-200 p-12 text-center">
+                <div className="mx-auto max-w-md">
+                  <AlertTriangle className="mx-auto h-12 w-12 text-gray-400" />
+                  <h3 className="mt-2 text-lg font-medium text-gray-900">No projects found</h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Try adjusting your search or filter criteria
+                  </p>
+                  <div className="mt-6">
+                    <Button onClick={() => {
+                      setSearchTerm("");
+                      setStatusFilter("all");
+                      setImportanceFilter("all");
+                      setManagerFilter("all");
+                      setEscalationFilter("all");
+                    }}>
+                      Clear all filters
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {currentProjects.map((project) => (
+                    <ExternalProjectCard 
+                      key={project.projectId} 
+                      project={project}
+                    />
+                  ))}
                 </div>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </Button>
-              </div>
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center space-x-2 mt-8">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-2" />
+                      Previous
+                    </Button>
+
+                    <div className="flex items-center space-x-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter((page) => page === 1 || page === totalPages || (page >= currentPage - 2 && page <= currentPage + 2))
+                        .map((page, index, array) => (
+                          <div key={page} className="flex items-center">
+                            {index > 0 && page - array[index - 1] > 1 && (
+                              <span className="px-2 text-gray-400">...</span>
+                            )}
+                            <Button
+                              variant={currentPage === page ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setCurrentPage(page)}
+                              className="min-w-[2.5rem]"
+                            >
+                              {page}
+                            </Button>
+                          </div>
+                        ))}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

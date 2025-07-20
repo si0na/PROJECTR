@@ -116,6 +116,7 @@ export default function ProjectDetailsPage() {
   // Get project id from URL
   const pathSegments = window.location.pathname.split("/");
   const id = pathSegments[pathSegments.length - 1];
+  const [referrer, setReferrer] = React.useState("/");
   
   // Fetch projects data
   const { data: projects, isLoading: projectsLoading } = useQuery<ExternalProject[]>({
@@ -155,12 +156,12 @@ export default function ProjectDetailsPage() {
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Project Not Found</h2>
           <p className="text-gray-600 mb-4">The project with ID {id} could not be found.</p>
-          <Link href="/projects">
-            <a className="text-blue-600 hover:text-blue-800 font-semibold">
-              <ArrowLeft className="h-4 w-4 inline mr-2" />
-              Back to Projects
-            </a>
-          </Link>
+          <Link href={referrer}>
+  <a className="flex items-center text-blue-600 hover:text-blue-800 font-semibold text-lg transition">
+    <ArrowLeft className="h-5 w-5 mr-2" /> 
+    Back to {referrer === '/projects' ? 'Projects' : 'Dashboard'}
+  </a>
+</Link>
         </div>
       </div>
     );
@@ -200,14 +201,15 @@ export default function ProjectDetailsPage() {
     })) || [];
 
   return (
-    <div className="min-h-[calc(100vh-0px)] w-full flex flex-col items-stretch bg-gradient-to-br from-blue-50 to-indigo-50 animate-fade-in">
+    <div className="min-h-[calc(100vh-0px)] w-ful flex flex-col items-stretch bg-gradient-to-br from-blue-50 to-indigo-50 animate-fade-in">
       {/* Sticky Back Button */}
       <div className="sticky top-0 z-20 bg-gradient-to-br from-blue-50 to-indigo-50/80 py-4 px-2 sm:px-6 md:px-12 lg:px-24 xl:px-32 shadow-sm flex items-center">
-        <Link href="/projects">
-          <a className="flex items-center text-blue-600 hover:text-blue-800 font-semibold text-lg transition">
-            <ArrowLeft className="h-5 w-5 mr-2" /> Back to Projects
-          </a>
-        </Link>
+      <Link href={referrer}>
+  <a className="flex items-center text-blue-600 hover:text-blue-800 font-semibold text-lg transition">
+    <ArrowLeft className="h-5 w-5 mr-2" /> 
+    Back to {referrer === '/projects' ? 'Projects' : 'Dashboard'}
+  </a>
+</Link>
       </div>
       
       <div className="flex flex-col flex-grow items-center justify-center py-8 px-2 sm:px-6 md:px-12 lg:px-24 xl:px-32">
