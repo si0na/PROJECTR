@@ -120,7 +120,7 @@ export function AIAssessmentHeader() {
   const { data: assessments, isLoading, error, refetch } = useQuery<Assessment[]>({
     queryKey: ["assessments"],
     queryFn: async () => {
-      const response = await fetch("http://34.63.198.88:8080/api/organizational-assessments/dashboard");
+      const response = await fetch("http://34.63.198.88/api/organizational-assessments/dashboard");
       
       if (!response.ok) {
         const text = await response.text();

@@ -133,7 +133,7 @@ Role: Admin with executive portfolio oversight capabilities
 ## Recent Changes: Latest modifications with dates
 
 ### July 19, 2025 - External API Integration
-- **Complete Migration**: Successfully migrated from local Express API to external API at `http://34.63.198.88:8080/api/projects/`
+- **Complete Migration**: Successfully migrated from local Express API to external API at `http://34.63.198.88/api/projects/`
 - **Proxy Implementation**: Created Express proxy endpoint to handle CORS issues with external API
 - **Frontend Updates**: Updated all React Query calls across 8+ components to use external API endpoint
 - **Error Handling**: Added comprehensive error handling and fallbacks for external API failures

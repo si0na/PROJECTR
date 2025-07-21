@@ -127,7 +127,7 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
         }))
       };
 
-      const response = await fetch('http://34.63.198.88:8080/api/projects/', {
+      const response = await fetch('http://34.63.198.88/api/projects/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

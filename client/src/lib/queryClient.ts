@@ -48,9 +48,10 @@ export async function externalApiRequest(endpoint: string) {
       console.log('Sample project keys:', Object.keys(data[0]));
     }
     return data;
-  } catch (error) {
-    console.error('External API error:', error.message || error);
-    throw error;
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error('External API error:', errorMessage);
+    throw new Error(errorMessage);
   }
 }
 
@@ -61,10 +62,23 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const keyString = queryKey.join("/") as string;
     
-    // Use proxy endpoint for external projects
-    if (keyString === "/api/projects/external") {
-      // Use local proxy endpoint instead of direct external call
-      const res = await fetch('/api/projects', {
+    try {
+      // Use proxy endpoint for external projects
+      if (keyString === "/api/projects/external") {
+        // Use local proxy endpoint instead of direct external call
+        const res = await fetch('/api/projects', {
+          credentials: "include",
+        });
+
+        if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+          return null;
+        }
+
+        await throwIfResNotOk(res);
+        return await res.json();
+      }
+      
+      const res = await fetch(keyString, {
         credentials: "include",
       });
 
@@ -74,18 +88,12 @@ export const getQueryFn: <T>(options: {
 
       await throwIfResNotOk(res);
       return await res.json();
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Unknown error occurred during query');
     }
-    
-    const res = await fetch(keyString, {
-      credentials: "include",
-    });
-
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
-    }
-
-    await throwIfResNotOk(res);
-    return await res.json();
   };
 
 export const queryClient = new QueryClient({
