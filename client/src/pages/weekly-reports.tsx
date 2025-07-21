@@ -77,10 +77,20 @@ export default function WeeklyReports() {
   });
 
   const { data: projects } = useQuery<Project[]>({
-    queryKey: ["/api/projects/external"],
-    
+    queryKey: ["/api/projects"],
   });
-
+  // other fields...
+  // other fields...
+// In your type definitions (e.g., types/project.ts)
+interface Project {
+  projectId: number;
+  projectName: string;
+  // other fields...
+  codeId: string;
+  account: string;
+  customer: string;
+  // etc...
+}
   const getRagStatusStyles = (status: string) => {
     switch (status?.toLowerCase() || "") {
       case "green":
@@ -362,19 +372,21 @@ export default function WeeklyReports() {
 
             <div className="flex gap-3">
               <Select value={projectFilter} onValueChange={setProjectFilter}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="All Projects" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Projects</SelectItem>
-                  {projects?.map((project) => (
-                    <SelectItem key={project.id} value={project.id.toString()}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
+  <SelectTrigger className="w-48">
+    <SelectValue placeholder="All Projects" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="all">All Projects</SelectItem>
+    {projects?.map((project) => (
+      <SelectItem 
+        key={project.projectId} 
+        value={project.projectId.toString()}
+      >
+        {project.projectName}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
               <Collapsible
                 open={filtersOpen}
                 onOpenChange={setFiltersOpen}

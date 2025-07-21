@@ -12,6 +12,8 @@ import {
   ChevronRight,
   AlertTriangle,
   CheckCircle,
+  ArrowUpDown,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -456,6 +458,8 @@ export default function Projects() {
   const [importanceFilter, setImportanceFilter] = useState<string>("all");
   const [managerFilter, setManagerFilter] = useState<string>("all");
   const [escalationFilter, setEscalationFilter] = useState<string>("all");
+  const [sortField, setSortField] = useState<string>("projectName");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(12);
@@ -523,11 +527,62 @@ export default function Projects() {
     return true;
   }) || [];
 
+  // Sort projects with custom ordering for status and importance
+  const sortedProjects = [...filteredProjects].sort((a, b) => {
+    // Define the custom order for status and importance
+    const statusOrder = { 'Red': 0, 'Amber': 1, 'Green': 2, '': 3 };
+    const importanceOrder = { 'High': 0, 'Medium': 1, 'Low': 2, '': 3 };
+
+    let valueA: any, valueB: any;
+
+    if (sortField === "status") {
+      const latestStatusA = a.projectStatuses?.length > 0
+        ? [...a.projectStatuses].sort((a, b) => 
+            new Date(b.reportingDate).getTime() - new Date(a.reportingDate).getTime()
+          )[0]
+        : null;
+      const latestStatusB = b.projectStatuses?.length > 0
+        ? [...b.projectStatuses].sort((a, b) => 
+            new Date(b.reportingDate).getTime() - new Date(a.reportingDate).getTime()
+          )[0]
+        : null;
+      
+      valueA = latestStatusA?.ragStatus || "";
+      valueB = latestStatusB?.ragStatus || "";
+      
+      // Use the custom status order for comparison
+      valueA = statusOrder[valueA as keyof typeof statusOrder] ?? 3;
+      valueB = statusOrder[valueB as keyof typeof statusOrder] ?? 3;
+    } else if (sortField === "importance") {
+      valueA = a.importance || "";
+      valueB = b.importance || "";
+      
+      // Use the custom importance order for comparison
+      valueA = importanceOrder[valueA as keyof typeof importanceOrder] ?? 3;
+      valueB = importanceOrder[valueB as keyof typeof importanceOrder] ?? 3;
+    } else if (sortField === "manager") {
+      valueA = a.projectManagerName || "";
+      valueB = b.projectManagerName || "";
+    } else {
+      // Default sort by project name
+      valueA = a.projectName || "";
+      valueB = b.projectName || "";
+    }
+
+    if (valueA < valueB) {
+      return sortDirection === "asc" ? -1 : 1;
+    }
+    if (valueA > valueB) {
+      return sortDirection === "asc" ? 1 : -1;
+    }
+    return 0;
+  });
+
   // Pagination
-  const totalPages = Math.ceil(filteredProjects.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedProjects.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentProjects = filteredProjects.slice(startIndex, endIndex);
+  const currentProjects = sortedProjects.slice(startIndex, endIndex);
 
   // Get unique PM names from data with proper typing
   const pmNames = Array.from(
@@ -537,6 +592,24 @@ export default function Projects() {
   ).sort((a: string, b: string) => a.localeCompare(b));
 
   const canCreateProjects = user?.role === USER_ROLES.DELIVERY_MANAGER || user?.role === USER_ROLES.ADMIN;
+
+  const toggleSortDirection = () => {
+    setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+  };
+
+  const handleSortChange = (field: string) => {
+    if (sortField === field) {
+      toggleSortDirection();
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const handleGenerateAssessment = () => {
+    // TODO: Implement assessment generation logic
+    console.log('Generating new assessment for all projects');
+  };
 
   return (
     <div className="flex-1 overflow-auto">
@@ -557,9 +630,16 @@ export default function Projects() {
                 Manage and monitor your project portfolio
               </p>
             </div>
-
+            
             {canCreateProjects && (
               <div className="flex gap-2">
+                <Button
+                  onClick={handleGenerateAssessment}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Generate Assessment
+                </Button>
                 <Dialog open={createProjectOpen} onOpenChange={setCreateProjectOpen}>
                   <DialogTrigger asChild>
                     <Button>
@@ -581,14 +661,14 @@ export default function Projects() {
       </div>
 
       <div className="max-w-7xl mx-auto p-6">
-        {/* Filters */}
+        {/* Filters and Sorting */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search projects by name or customer..."
+                  placeholder="Search projects by name or account..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -697,6 +777,39 @@ export default function Projects() {
                   </div>
                 </SelectContent>
               </Select>
+
+              {/* Sort Dropdown */}
+              <Select
+                value={sortField}
+                onValueChange={(value) => handleSortChange(value)}
+              >
+                <SelectTrigger className="w-40">
+                  <ArrowUpDown className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="projectName">
+                    {sortField === "projectName" && sortDirection === "asc" ? "↑ " : ""}
+                    {sortField === "projectName" && sortDirection === "desc" ? "↓ " : ""}
+                    Project Name
+                  </SelectItem>
+                  <SelectItem value="status">
+                    {sortField === "status" && sortDirection === "asc" ? "↑ " : ""}
+                    {sortField === "status" && sortDirection === "desc" ? "↓ " : ""}
+                    Status
+                  </SelectItem>
+                  <SelectItem value="importance">
+                    {sortField === "importance" && sortDirection === "asc" ? "↑ " : ""}
+                    {sortField === "importance" && sortDirection === "desc" ? "↓ " : ""}
+                    Importance
+                  </SelectItem>
+                  <SelectItem value="manager">
+                    {sortField === "manager" && sortDirection === "asc" ? "↑ " : ""}
+                    {sortField === "manager" && sortDirection === "desc" ? "↓ " : ""}
+                    Project Manager
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>
@@ -710,7 +823,7 @@ export default function Projects() {
           <>
             <div className="flex items-center justify-between mb-6">
               <p className="text-sm text-gray-600">
-                Showing {startIndex + 1}-{Math.min(endIndex, filteredProjects.length)} of {filteredProjects.length} projects
+                Showing {startIndex + 1}-{Math.min(endIndex, sortedProjects.length)} of {sortedProjects.length} projects
               </p>
               {(searchTerm || statusFilter !== "all" || importanceFilter !== "all") && (
                 <Button
@@ -730,7 +843,7 @@ export default function Projects() {
               )}
             </div>
 
-            {filteredProjects.length === 0 ? (
+            {sortedProjects.length === 0 ? (
               <div className="bg-white rounded-lg border border-dashed border-gray-200 p-12 text-center">
                 <div className="mx-auto max-w-md">
                   <AlertTriangle className="mx-auto h-12 w-12 text-gray-400" />

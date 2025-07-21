@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Bot, Activity, Star, ChevronRight, AlertCircle } from "lucide-react";
+import { Bot, Activity, Star, ChevronRight, AlertCircle, RefreshCw } from "lucide-react";
 import React from "react";
 import { useLocation } from "wouter";
 
@@ -117,7 +117,7 @@ interface StrategicProjectsData {
 type StatusType = "green" | "amber" | "red" | "error";
 
 export function AIAssessmentHeader() {
-  const { data: assessments, isLoading, error } = useQuery<Assessment[]>({
+  const { data: assessments, isLoading, error, refetch } = useQuery<Assessment[]>({
     queryKey: ["assessments"],
     queryFn: async () => {
       const response = await fetch("http://34.63.198.88:8080/api/organizational-assessments/dashboard");
@@ -188,13 +188,21 @@ export function AIAssessmentHeader() {
       };
     }
 
-    const total = Object.values(strategicGroup).reduce((sum, count) => sum + count, 0);
+    // Filter out the error status and count all other statuses
+    const filteredStatusCounts = Object.entries(strategicGroup).reduce((acc, [status, count]) => {
+      if (status.toLowerCase() !== "error") {
+        acc[status] = count;
+      }
+      return acc;
+    }, {} as Record<string, number>);
+
+    const total = Object.values(filteredStatusCounts).reduce((sum, count) => sum + count, 0);
     
     return {
       total,
-      statusCounts: strategicGroup,
+      statusCounts: filteredStatusCounts,
       displayText: `${total} Strategic Projects` +
-        (total > 0 ? ` (${Object.entries(strategicGroup)
+        (total > 0 ? ` (${Object.entries(filteredStatusCounts)
           .map(([status, count]) => `${status}: ${count}`)
           .join(", ")})` : "")
     };
@@ -247,15 +255,19 @@ export function AIAssessmentHeader() {
       return "Invalid date";
     }
   };
-// Update the navigation function to use correct state typing
-const navigateToProject = (projectId: number) => {
-  setLocation(`/projects/${projectId}`, {
-    state: { from: 'dashboard' } // Properly typed state object
-  });
-};
+
+  const navigateToProject = (projectId: number) => {
+    setLocation(`/projects/${projectId}`, {
+      state: { from: 'dashboard' }
+    });
+  };
 
   const handleStatusClick = (status: StatusType) => {
     setSelectedStatus(selectedStatus === status ? null : status);
+  };
+
+  const handleGenerateAssessment = () => {
+    refetch();
   };
 
   React.useEffect(() => {
@@ -336,6 +348,17 @@ const navigateToProject = (projectId: number) => {
   return (
     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-b border-blue-100 p-8">
       <div className="max-w-7xl mx-auto">
+        {/* Top Generate Assessment Button */}
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={handleGenerateAssessment}
+            className="flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition font-medium"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Generate New Assessment
+          </button>
+        </div>
+
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center space-x-3">
             <div className="w-12 h-12 bg-white border border-blue-200 rounded-2xl flex items-center justify-center shadow-sm">
@@ -349,7 +372,6 @@ const navigateToProject = (projectId: number) => {
           {analysis && (
             <div className="text-xs text-gray-500 bg-white/80 px-3 py-1.5 rounded-full border border-blue-100 shadow-sm">
               Last updated: {formatDate(analysis.analysisDate)}
-              <span className="ml-2 text-blue-600">• Assessed by: {currentAssessment.assessedPersonName}</span>
             </div>
           )}
         </div>
@@ -363,14 +385,9 @@ const navigateToProject = (projectId: number) => {
                   <p className="font-bold text-lg text-gray-900 capitalize">
                     {analysis?.overallPortfolioRagStatus || "unknown"}
                   </p>
-                  <p className="text-sm text-gray-600">Portfolio Health</p>
+                  <p className="text-sm text-gray-600">Status</p>
                 </div>
               </div>
-              {currentAssessment.assessmentLevel && (
-                <div className="absolute top-3 right-3 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full border border-blue-200">
-                  {currentAssessment.assessmentLevel.replace(/_/g, ' ')}
-                </div>
-              )}
             </div>
 
             <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-lg p-4 border-2 border-yellow-200">
@@ -400,8 +417,8 @@ const navigateToProject = (projectId: number) => {
                   <Activity className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <p className="font-bold text-lg text-gray-900">{totalProjects}</p>
-                  <p className="text-sm text-gray-600">Tracked Projects</p>
+                  <p className="font-bold text-lg text-gray-900">{currentAssessment.overallHealthScore}</p>
+                  <p className="text-sm text-gray-600">Overall Health Score</p>
                 </div>
               </div>
             </div>
@@ -508,7 +525,6 @@ const navigateToProject = (projectId: number) => {
               >
                 <span className="mr-2 text-lg">🔴</span> {metrics.red} Red
               </button>
-             
 
               {selectedStatus && (
                 <div
@@ -548,26 +564,26 @@ const navigateToProject = (projectId: number) => {
                             </p>
                           </div>
                           <button
-  onClick={() => {
-    if (!project.projectId) {
-      console.error("Missing projectId for:", project.projectName);
-      return;
-    }
-    setLocation(`/projects/${project.projectId}`, {
-      state: { from: 'dashboard' } // Proper state typing
-    });
-  }}
-  className={`ml-4 px-3 py-1.5 rounded-lg text-xs font-semibold transition text-white flex items-center ${
-    selectedStatus === "green" 
-      ? "bg-green-600 hover:bg-green-700" 
-      : selectedStatus === "amber" 
-        ? "bg-yellow-500 hover:bg-yellow-600" 
-        : "bg-red-600 hover:bg-red-700"
-  }`}
->
-  View
-  <ChevronRight className="h-3 w-3 ml-1" />
-</button>
+                            onClick={() => {
+                              if (!project.projectId) {
+                                console.error("Missing projectId for:", project.projectName);
+                                return;
+                              }
+                              setLocation(`/projects/${project.projectId}`, {
+                                state: { from: 'dashboard' }
+                              });
+                            }}
+                            className={`ml-4 px-3 py-1.5 rounded-lg text-xs font-semibold transition text-white flex items-center ${
+                              selectedStatus === "green" 
+                                ? "bg-green-600 hover:bg-green-700" 
+                                : selectedStatus === "amber" 
+                                  ? "bg-yellow-500 hover:bg-yellow-600" 
+                                  : "bg-red-600 hover:bg-red-700"
+                            }`}
+                          >
+                            View
+                            <ChevronRight className="h-3 w-3 ml-1" />
+                          </button>
                         </li>
                       ))
                     ) : (
@@ -588,6 +604,9 @@ const navigateToProject = (projectId: number) => {
             </div>
           </div>
         </div>
+
+        {/* Bottom Generate Assessment Button */}
+        
       </div>
     </div>
   );

@@ -30,7 +30,7 @@ const projectFormSchema = z.object({
   wsrPublisYesNo: z.string(),
   importance: z.string().min(1, "Importance is required"),
   isActive: z.boolean(),
-  statuses: z.array(
+  projectStatuses: z.array(
     z.object({
       reportingDate: z.date().refine(date => {
         // Ensure date is Monday (start of week)
@@ -59,17 +59,18 @@ const projectFormSchema = z.object({
     return new Set(weeks).size === weeks.length;
   }, {
     message: "Only one status update allowed per week",
-    path: ["statuses"]
+    path: ["projectStatuses"]
   })
 });
 
 type ProjectFormData = z.infer<typeof projectFormSchema>;
 
-const billingModels = ["Time and Material", "Fixed Price", "Hybrid", "Retainer"];
-const towers = ["Data & Analytics", "Cloud", "Digital", "Security", "Infrastructure"];
+const billingModels = ["Time and Material", "Fixed Price", "Hybrid", "Retainer", "Fixed Bid"];
+const towers = ["Data & Analytics", "Cloud", "Digital", "Security", "Infrastructure", "Tower 1", "Tower 2"];
 const importanceLevels = ["Low", "Medium", "High", "Critical"];
 const ragStatuses = ["Green", "Amber", "Red"];
 const sdlcPhases = ["Planning", "Analysis", "Design", "Development", "Testing", "Deployment", "Maintenance"];
+const deliveryModels = ["Agile", "Waterfall", "Hybrid"];
 
 interface ProjectFormProps {
   initialData?: Partial<ProjectFormData>;
@@ -96,7 +97,7 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
       wsrPublisYesNo: "Y",
       importance: "Medium",
       isActive: true,
-      statuses: [{
+      projectStatuses: [{
         reportingDate: startOfWeek(new Date(), { weekStartsOn: 1 }), // Always Monday
         projectImportance: "Medium",
         deliveryModel: "Hybrid",
@@ -116,9 +117,30 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
 
   const createProjectMutation = useMutation({
     mutationFn: async (data: ProjectFormData) => {
-      // Simulate API call
-      console.log("Submitting project data:", data);
-      return new Promise((resolve) => setTimeout(resolve, 1000));
+      // Prepare the data for API
+      const apiData = {
+        ...data,
+        projectStatuses: data.projectStatuses.map(status => ({
+          ...status,
+          reportingDate: format(status.reportingDate, 'yyyy-MM-dd'),
+          clientEscalation: status.clientEscalation ? 1 : 0
+        }))
+      };
+
+      const response = await fetch('http://34.63.198.88:8080/api/projects/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(apiData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save project');
+      }
+
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
@@ -158,8 +180,8 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
       sqaRemarks: ""
     };
     
-    form.setValue("statuses", [...form.getValues("statuses"), newStatus]);
-    setEditingStatusIndex(form.getValues("statuses").length - 1);
+    form.setValue("projectStatuses", [...form.getValues("projectStatuses"), newStatus]);
+    setEditingStatusIndex(form.getValues("projectStatuses").length - 1);
     setActiveStep(1);
   };
 
@@ -169,7 +191,7 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
   };
 
   const deleteStatus = (index: number) => {
-    const statuses = form.getValues("statuses");
+    const statuses = form.getValues("projectStatuses");
     if (statuses.length <= 1) {
       toast({
         title: "Error",
@@ -180,7 +202,7 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
     }
     
     const newStatuses = statuses.filter((_, i) => i !== index);
-    form.setValue("statuses", newStatuses);
+    form.setValue("projectStatuses", newStatuses);
     
     if (editingStatusIndex === index) {
       setEditingStatusIndex(null);
@@ -438,7 +460,7 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
 
               {/* Status List */}
               <div className="space-y-4">
-                {form.getValues("statuses").map((status, index) => (
+                {form.getValues("projectStatuses").map((status, index) => (
                   <Card 
                     key={index} 
                     className={`${editingStatusIndex === index ? 'border-blue-500' : ''}`}
@@ -462,7 +484,7 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
                           >
                             {editingStatusIndex === index ? "Editing" : "Edit"}
                           </Button>
-                          {form.getValues("statuses").length > 1 && (
+                          {form.getValues("projectStatuses").length > 1 && (
                             <Button 
                               type="button" 
                               variant="outline" 
@@ -482,7 +504,7 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                           <FormField
                             control={form.control}
-                            name={`statuses.${index}.reportingDate`}
+                            name={`projectStatuses.${index}.reportingDate`}
                             render={({ field }) => (
                               <FormItem className="flex flex-col">
                                 <FormLabel>Week Date *</FormLabel>
@@ -526,7 +548,57 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
 
                           <FormField
                             control={form.control}
-                            name={`statuses.${index}.ragStatus`}
+                            name={`projectStatuses.${index}.projectImportance`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Project Importance *</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select importance level" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {importanceLevels.map((level) => (
+                                      <SelectItem key={level} value={level}>
+                                        {level}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name={`projectStatuses.${index}.deliveryModel`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Delivery Model *</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select delivery model" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {deliveryModels.map((model) => (
+                                      <SelectItem key={model} value={model}>
+                                        {model}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name={`projectStatuses.${index}.ragStatus`}
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>RAG Status *</FormLabel>
@@ -551,7 +623,7 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
 
                           <FormField
                             control={form.control}
-                            name={`statuses.${index}.currentSdlcPhase`}
+                            name={`projectStatuses.${index}.currentSdlcPhase`}
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>SDLC Phase *</FormLabel>
@@ -576,7 +648,7 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
 
                           <FormField
                             control={form.control}
-                            name={`statuses.${index}.clientEscalation`}
+                            name={`projectStatuses.${index}.clientEscalation`}
                             render={({ field }) => (
                               <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                                 <div className="space-y-0.5">
@@ -595,10 +667,10 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
                             )}
                           />
 
-                          {form.watch(`statuses.${index}.clientEscalation`) && (
+                          {form.watch(`projectStatuses.${index}.clientEscalation`) && (
                             <FormField
                               control={form.control}
-                              name={`statuses.${index}.clientEscalationDetails`}
+                              name={`projectStatuses.${index}.clientEscalationDetails`}
                               render={({ field }) => (
                                 <FormItem className="md:col-span-2">
                                   <FormLabel>Escalation Details</FormLabel>
@@ -616,7 +688,7 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
 
                           <FormField
                             control={form.control}
-                            name={`statuses.${index}.weeklyUpdateColumn`}
+                            name={`projectStatuses.${index}.weeklyUpdateColumn`}
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>Week Identifier *</FormLabel>
@@ -633,7 +705,7 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
 
                           <FormField
                             control={form.control}
-                            name={`statuses.${index}.keyWeeklyUpdates`}
+                            name={`projectStatuses.${index}.keyWeeklyUpdates`}
                             render={({ field }) => (
                               <FormItem className="md:col-span-2">
                                 <FormLabel>Key Updates *</FormLabel>
@@ -650,7 +722,7 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
 
                           <FormField
                             control={form.control}
-                            name={`statuses.${index}.issuesChallenges`}
+                            name={`projectStatuses.${index}.issuesChallenges`}
                             render={({ field }) => (
                               <FormItem className="md:col-span-2">
                                 <FormLabel>Issues & Challenges *</FormLabel>
@@ -667,7 +739,7 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
 
                           <FormField
                             control={form.control}
-                            name={`statuses.${index}.planForNextWeek`}
+                            name={`projectStatuses.${index}.planForNextWeek`}
                             render={({ field }) => (
                               <FormItem className="md:col-span-2">
                                 <FormLabel>Plan for Next Week *</FormLabel>
@@ -684,7 +756,7 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
 
                           <FormField
                             control={form.control}
-                            name={`statuses.${index}.planForGreen`}
+                            name={`projectStatuses.${index}.planForGreen`}
                             render={({ field }) => (
                               <FormItem className="md:col-span-2">
                                 <FormLabel>Plan to Achieve Green</FormLabel>
@@ -701,7 +773,7 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
 
                           <FormField
                             control={form.control}
-                            name={`statuses.${index}.sqaRemarks`}
+                            name={`projectStatuses.${index}.sqaRemarks`}
                             render={({ field }) => (
                               <FormItem className="md:col-span-2">
                                 <FormLabel>SQA Remarks</FormLabel>
@@ -727,6 +799,14 @@ export function ProjectForm({ initialData, onSuccess, onCancel }: ProjectFormPro
                                 {status.ragStatus}
                               </Badge>
                             </div>
+                          </div>
+                          <div>
+                            <Label className="text-sm text-muted-foreground">Importance</Label>
+                            <p className="mt-1 text-sm">{status.projectImportance}</p>
+                          </div>
+                          <div>
+                            <Label className="text-sm text-muted-foreground">Delivery Model</Label>
+                            <p className="mt-1 text-sm">{status.deliveryModel}</p>
                           </div>
                           <div>
                             <Label className="text-sm text-muted-foreground">SDLC Phase</Label>

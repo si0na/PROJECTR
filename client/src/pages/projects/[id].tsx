@@ -1,11 +1,13 @@
 import React from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { ArrowLeft, Info, ClipboardList, AlertTriangle, CheckCircle, RefreshCw, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+
 interface LocationState {
   from?: 'dashboard' | 'projects';
+  previousPath?: string;
 }
+
 // Type definitions based on your actual API response
 interface ExternalProject {
   projectId: number;
@@ -101,27 +103,98 @@ const parseActionItemsToTasks = (actionItems: string): Array<{task: string, prio
 };
 
 export default function ProjectDetailsPage() {
-
- const [location, setLocation] = useLocation();
-  const navigationState: LocationState = (useLocation()[1] as { state?: LocationState })?.state || {};
-
+  const [location, navigate] = useLocation();
+  
+  // Get the project ID from the URL
   const pathSegments = window.location.pathname.split("/");
-const id = pathSegments[pathSegments.length - 1];
-  // Determine back path
-  const getBackPath = () => {
-    // Check navigation state first
-    if (navigationState?.from === 'dashboard') return '/';
-    if (navigationState?.from === 'projects') return '/projects';
-    
-    // Fallback to URL path checking
-    if (location.includes('/projects')) return '/projects';
-    
-    // Default to dashboard
-    return '/';
+  const id = pathSegments[pathSegments.length - 1];
+
+  // Get navigation state from browser history
+  const getNavigationState = (): LocationState => {
+    try {
+      // Check if we have state from navigation
+      const historyState = window.history.state;
+      if (historyState && typeof historyState === 'object') {
+        return historyState as LocationState;
+      }
+    } catch (error) {
+      console.warn('Could not access history state:', error);
+    }
+    return {};
   };
 
-  const backPath = getBackPath();
-  
+  const navigationState = getNavigationState();
+
+  // Determine back path with multiple fallback strategies
+  const getBackPath = (): { path: string; label: string } => {
+    // Strategy 1: Check navigation state
+    if (navigationState?.from === 'dashboard') {
+      return { path: '/', label: 'Dashboard' };
+    }
+    if (navigationState?.from === 'projects') {
+      return { path: '/projects', label: 'Projects' };
+    }
+    if (navigationState?.previousPath) {
+      const label = navigationState.previousPath === '/' ? 'Dashboard' : 'Projects';
+      return { path: navigationState.previousPath, label };
+    }
+
+    // Strategy 2: Check document referrer
+    if (document.referrer) {
+      try {
+        const referrerUrl = new URL(document.referrer);
+        const referrerPath = referrerUrl.pathname;
+        
+        if (referrerPath === '/' || referrerPath === '/dashboard') {
+          return { path: '/', label: 'Dashboard' };
+        }
+        if (referrerPath === '/projects' || referrerPath.startsWith('/projects')) {
+          return { path: '/projects', label: 'Projects' };
+        }
+      } catch (error) {
+        console.warn('Could not parse referrer URL:', error);
+      }
+    }
+
+    // Strategy 3: Check browser history length and URL patterns
+    if (window.history.length > 1) {
+      // If we have history, try to go back
+      if (location.includes('/projects/')) {
+        // We're likely in a project detail page, so projects list is a safe bet
+        return { path: '/projects', label: 'Projects' };
+      }
+    }
+
+    // Strategy 4: Default fallback based on URL structure
+    if (location.includes('/projects/')) {
+      return { path: '/projects', label: 'Projects' };
+    }
+
+    // Final fallback to dashboard
+    return { path: '/', label: 'Dashboard' };
+  };
+
+  const { path: backPath, label: backLabel } = getBackPath();
+
+  // Enhanced back navigation handler
+  const handleBackNavigation = (e: React.MouseEvent) => {
+    e.preventDefault();
+    
+    try {
+      // If we have a reliable history state, use browser back
+      if (navigationState?.from && window.history.length > 1) {
+        window.history.back();
+        return;
+      }
+      
+      // Otherwise, navigate to the determined path
+      navigate(backPath);
+    } catch (error) {
+      console.warn('Navigation error:', error);
+      // Fallback to direct navigation
+      navigate(backPath);
+    }
+  };
 
   const { data: projects, isLoading: projectsLoading } = useQuery<ExternalProject[]>({
     queryKey: ["/api/projects/external"],
@@ -232,6 +305,18 @@ const id = pathSegments[pathSegments.length - 1];
       details: s.clientEscalationDetails
     })) || [];
 
+  // Render back button component
+  const renderBackButton = () => (
+    <button
+      onClick={handleBackNavigation}
+      className={`flex items-center ${text} hover:opacity-80 font-semibold text-lg transition-opacity duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 rounded-lg px-2 py-1`}
+      aria-label={`Back to ${backLabel}`}
+    >
+      <ArrowLeft className={`h-5 w-5 mr-2 ${icon}`} /> 
+      Back to {backLabel}
+    </button>
+  );
+
   if (projectsLoading) {
     return (
       <div className="min-h-[calc(100vh-0px)] w-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
@@ -249,12 +334,7 @@ const id = pathSegments[pathSegments.length - 1];
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Project Not Found</h2>
           <p className="text-gray-600 mb-4">The project with ID {id} could not be found.</p>
-   <Link href={backPath}>
-  <a className={`flex items-center ${text} hover:opacity-80 font-semibold text-lg transition`}>
-    <ArrowLeft className={`h-5 w-5 mr-2 ${icon}`} /> 
-    Back to {backPath === '/projects' ? 'Projects' : 'Dashboard'}
-  </a>
-</Link>
+          {renderBackButton()}
         </div>
       </div>
     );
@@ -262,14 +342,9 @@ const id = pathSegments[pathSegments.length - 1];
 
   return (
     <div className={`min-h-[calc(100vh-0px)] w-full flex flex-col items-stretch ${bg} animate-fade-in`}>
-      {/* Status Header */}
+      {/* Status Header with improved back button */}
       <div className={`sticky top-0 z-20 ${headerBg} py-4 px-2 sm:px-6 md:px-12 lg:px-24 xl:px-32 shadow-sm flex items-center border-b ${border}`}>
-        <Link href={backPath}>
-  <a className={`flex items-center ${text} hover:opacity-80 font-semibold text-lg transition`}>
-    <ArrowLeft className={`h-5 w-5 mr-2 ${icon}`} /> 
-    Back to {backPath === '/projects' ? 'Projects' : 'Dashboard'}
-  </a>
-</Link>
+        {renderBackButton()}
         
         <div className={`ml-auto px-4 py-2 rounded-full ${bg} border ${border} ${text} font-bold flex items-center`}>
           <StatusIcon className={`h-5 w-5 mr-2 ${icon}`} />
@@ -279,9 +354,6 @@ const id = pathSegments[pathSegments.length - 1];
 
       <div className={`flex flex-col flex-grow items-center justify-center py-8 px-2 sm:px-6 md:px-12 lg:px-24 xl:px-32 ${bg}`}>
         <div className="w-full flex flex-col gap-8">
-          {/* Status Alert */}
-          
-
           {/* Project Header */}
           <div className={`rounded-2xl shadow-lg ${shadow} border ${border} p-6 ${bg} flex flex-col md:flex-row md:items-center md:justify-between gap-4`}>
             <div>
