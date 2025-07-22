@@ -1,7 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { Bot, Activity, Star, ChevronRight, AlertCircle, RefreshCw, ChevronDown } from "lucide-react";
+import { Bot, Activity, Star, ChevronRight, AlertCircle, RefreshCw, ChevronDown, ChevronLeft } from "lucide-react";
 import React from "react";
 import { useLocation } from "wouter";
+
+const PAGINATION_STEPS = [
+  { key: "assessment", label: "Organization Assessment" },
+  { key: "risks", label: "Key Risks" },
+  { key: "recommendations", label: "Recommendations" }
+];
 
 interface ProjectStatus {
   statusId: string;
@@ -126,29 +132,45 @@ const DELIVERY_MANAGERS: Manager[] = [
   { name: "Ani", value: "Ani" }
 ];
 
+// Add all people and their levels
+const PEOPLE = [
+  { name: "Raja", value: "Raja", level: "DELIVERY_MANAGER" },
+  { name: "Ani", value: "Ani", level: "DELIVERY_MANAGER" },
+  { name: "Vijo Jacob", value: "Vijo Jacob", level: "PROJECT_MANAGER" },
+  { name: "Yamuna Rani M", value: "Yamuna Rani M", level: "PROJECT_MANAGER" },
+  { name: "Ashwathy Nair", value: "Ashwathy Nair", level: "PROJECT_MANAGER" },
+  { name: "Shanavaz A", value: "Shanavaz A", level: "PROJECT_MANAGER" },
+  { name: "ORG Head", value: "ORG Head", level: "ORG_HEAD" }
+];
+
 interface AIAssessmentHeaderProps {
-  selectedManager?: Manager;
-  onManagerChange?: (manager: Manager) => void;
+  selectedPerson?: { name: string; value: string; level: string };
+  onPersonChange?: (person: { name: string; value: string; level: string }) => void;
 }
 
-export function AIAssessmentHeader({ 
-  selectedManager: propSelectedManager, 
-  onManagerChange 
+export function AIAssessmentHeader({
+  selectedPerson: propSelectedPerson,
+  onPersonChange
 }: AIAssessmentHeaderProps) {
-  const [internalSelectedManager, setInternalSelectedManager] = React.useState(DELIVERY_MANAGERS[0]);
+  // Use the first person as default
+  const [internalSelectedPerson, setInternalSelectedPerson] = React.useState(PEOPLE[0]);
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
   const [, setLocation] = useLocation();
   const [selectedStatus, setSelectedStatus] = React.useState<StatusType | null>(null);
   const statusDropdownRef = React.useRef<HTMLDivElement>(null);
 
-  const selectedManager = propSelectedManager || internalSelectedManager;
+  // Add pagination state
+  const [aiPage, setAiPage] = React.useState(0);
 
+  const selectedPerson = propSelectedPerson || internalSelectedPerson;
+
+  // Use selectedPerson.value and selectedPerson.level in API
   const { data: assessments, isLoading, error, refetch } = useQuery<Assessment[]>({
-    queryKey: ["assessments", selectedManager.value],
+    queryKey: ["assessments", selectedPerson.value, selectedPerson.level],
     queryFn: async () => {
       const response = await fetch(
-        `http://34.63.198.88/api/organizational-assessments/dashboard?assessedPersonName=${selectedManager.value}&assessmentLevel=DELIVERY_MANAGER`
+        `http://34.63.198.88/api/organizational-assessments/dashboard?assessedPersonName=${selectedPerson.value}&assessmentLevel=${selectedPerson.level}`
       );
       
       if (!response.ok) {
@@ -171,8 +193,8 @@ export function AIAssessmentHeader({
 
   const currentAssessment = React.useMemo(() => {
     if (!assessments || assessments.length === 0) return null;
-    return assessments.find(a => a.assessedPersonName === selectedManager.value) || assessments[0];
-  }, [assessments, selectedManager]);
+    return assessments.find(a => a.assessedPersonName === selectedPerson.value) || assessments[0];
+  }, [assessments, selectedPerson]);
 
   const analysis = React.useMemo<PortfolioAnalysis | null>(() => {
     if (!currentAssessment) return null;
@@ -317,17 +339,69 @@ export function AIAssessmentHeader({
     setSelectedStatus(selectedStatus === status ? null : status);
   };
 
-  const handleGenerateAssessment = () => {
-    refetch();
+  const [isGenerating, setIsGenerating] = React.useState(false);
+
+  const handleGenerateAssessment = async () => {
+    if (!selectedPerson) {
+      alert("Please select a person first");
+      return;
+    }
+    
+    setIsGenerating(true);
+    try {
+      const response = await fetch("http://34.63.198.88:8080/api/organizational-assessments/generate", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          assessmentLevel: selectedPerson.level,
+          assessedPersonName: selectedPerson.value,
+          llmProvider: "gemini",
+          reAssess: true
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      // Show success message
+      alert("Assessment generated successfully!");
+      
+      // Refetch the data after a short delay to get the latest assessment
+      setTimeout(() => {
+        refetch();
+      }, 2000);
+      
+      return result;
+    } catch (error) {
+      console.error("Error generating assessment:", error);
+      alert(`Failed to generate assessment: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  const handleManagerSelect = (manager: Manager) => {
-    if (onManagerChange) {
-      onManagerChange(manager);
+  const handlePersonSelect = (person: typeof PEOPLE[0]) => {
+    if (onPersonChange) {
+      onPersonChange(person);
     } else {
-      setInternalSelectedManager(manager);
+      setInternalSelectedPerson(person);
     }
     setIsDropdownOpen(false);
+  };
+
+  // Helper to clean up bullet points and unwanted symbols
+  const cleanText = (text?: string): string[] => {
+    if (!text) return [];
+    return text
+      .split('\n')
+      .map(line => line.replace(/^[-*•\d\s]+/, '').trim())
+      .filter(line => line.length > 0);
   };
 
   React.useEffect(() => {
@@ -345,6 +419,11 @@ export function AIAssessmentHeader({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  // Reset pagination when selectedPerson changes
+  React.useEffect(() => {
+    setAiPage(0);
+  }, [selectedPerson]);
 
   if (isLoading) {
     return (
@@ -415,21 +494,23 @@ export function AIAssessmentHeader({
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className="flex items-center px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-lg shadow-sm transition font-medium border border-gray-300"
             >
-              {selectedManager.name}
+              {selectedPerson.name} <span className="ml-2 text-xs text-gray-500">({selectedPerson.level.replace("_", " ")})</span>
               <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${isDropdownOpen ? 'transform rotate-180' : ''}`} />
             </button>
             {isDropdownOpen && (
               <div className="absolute z-10 mt-1 w-full bg-white rounded-lg shadow-lg border border-gray-200">
                 <ul className="py-1">
-                  {DELIVERY_MANAGERS.map((manager) => (
-                    <li key={manager.value}>
+                  {PEOPLE.map((person) => (
+                    <li key={person.value + person.level}>
                       <button
-                        onClick={() => handleManagerSelect(manager)}
+                        onClick={() => handlePersonSelect(person)}
                         className={`w-full text-left px-4 py-2 hover:bg-blue-50 ${
-                          selectedManager.value === manager.value ? 'bg-blue-100 text-blue-700' : 'text-gray-700'
+                          selectedPerson.value === person.value && selectedPerson.level === person.level
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'text-gray-700'
                         }`}
                       >
-                        {manager.name}
+                        {person.name} <span className="ml-2 text-xs text-gray-500">({person.level.replace("_", " ")})</span>
                       </button>
                     </li>
                   ))}
@@ -440,10 +521,23 @@ export function AIAssessmentHeader({
           
           <button
             onClick={handleGenerateAssessment}
+            disabled={isGenerating}
             className="flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition font-medium"
           >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Generate New Assessment
+            {isGenerating ? (
+              <>
+                <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Generating...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Generate New Assessment
+              </>
+            )}
           </button>
         </div>
 
@@ -517,183 +611,213 @@ export function AIAssessmentHeader({
             </div>
           </div>
 
-          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-6 border-2 border-indigo-200">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-8 h-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center shadow-sm">
-                <svg width="20" height="20" fill="none" viewBox="0 0 20 20">
-                  <circle cx="10" cy="10" r="7" stroke="white" strokeWidth="2"/>
-                  <path d="M7 10l2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              <h3 className="font-semibold text-gray-900">AI Analysis & Recommendations</h3>
-              <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded-full">
-                {selectedManager.name}'s Assessment
-              </span>
-            </div>
-
-            <div className="text-xs text-gray-500 mb-3 flex flex-wrap gap-x-4 gap-y-1">
-              <span><span className="font-medium">Assessment Date:</span> {formatDate(currentAssessment.assessmentDate)}</span>
-              <span><span className="font-medium">Tracked Projects:</span> {totalProjects}</span>
-              <span><span className="font-medium">Strategic Projects:</span> {strategicProjectsData.total}</span>
-              {currentAssessment.escalationsCount !== undefined && (
-                <span><span className="font-medium">Escalations:</span> {currentAssessment.escalationsCount}</span>
-              )}
-            </div>
-            
-            <div className="text-sm text-gray-700 leading-relaxed mb-4 space-y-3">
-              {currentAssessment.llmOrgAssessmentDescription && (
-                <div className="bg-blue-50/50 p-3 rounded-lg">
-                  <span className="font-semibold text-blue-700">📊 Organization Assessment:</span>
-                  <p className="mt-1 ml-6 text-gray-600">
-                    {currentAssessment.llmOrgAssessmentDescription}
-                  </p>
-                </div>
-              )}
-
-              {currentAssessment.keyRisks && (
-                <div className="bg-red-50/50 p-3 rounded-lg">
-                  <span className="font-semibold text-red-600">⚠️ Key Risks:</span>
-                  <ul className="mt-1 ml-6 text-gray-600 list-disc space-y-1">
-                    {currentAssessment.keyRisks.split('\n')
-                      .filter(line => line.trim().length > 0)
-                      .slice(0, 3)
-                      .map((risk, i) => (
-                        <li key={i}>
-                          {risk.replace(/^•\s*/, '')
-                               .replace(/^Risk \d+:\s*/i, '')
-                               .trim()}
-                        </li>
-                      ))}
-                  </ul>
-                </div>
-              )}
-
-              {currentAssessment.recommendedActions && (
-                <div className="bg-green-50/50 p-3 rounded-lg">
-                  <span className="font-semibold text-green-700">💡 Recommendations:</span>
-                  <ul className="mt-1 ml-6 text-gray-600 list-disc space-y-1">
-                    {currentAssessment.recommendedActions.split('\n')
-                      .filter(line => line.trim().length > 0)
-                      .slice(0, 3)
-                      .map((action, i) => (
-                        <li key={i}>
-                          {action.replace(/^•\s*/, '')
-                                 .replace(/^Action \d+:\s*/i, '')
-                                 .trim()}
-                        </li>
-                      ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 mb-4 relative" ref={statusDropdownRef}>
-              <button
-                onClick={() => handleStatusClick("green")}
-                className={`flex items-center px-4 py-2 rounded-lg border shadow-sm transition font-bold focus:outline-none focus:ring-2 ${
-                  selectedStatus === "green" 
-                    ? "ring-green-400 bg-green-200" 
-                    : "bg-green-100 hover:bg-green-200 border-green-300 text-green-800"
-                }`}
-              >
-                <span className="mr-2 text-lg">🟢</span> {metrics.green} Green
-              </button>
-              <button
-                onClick={() => handleStatusClick("amber")}
-                className={`flex items-center px-4 py-2 rounded-lg border shadow-sm transition font-bold focus:outline-none focus:ring-2 ${
-                  selectedStatus === "amber" 
-                    ? "ring-yellow-400 bg-yellow-200" 
-                    : "bg-yellow-100 hover:bg-yellow-200 border-yellow-300 text-yellow-800"
-                }`}
-              >
-                <span className="mr-2 text-lg">🟡</span> {metrics.amber} Amber
-              </button>
-              <button
-                onClick={() => handleStatusClick("red")}
-                className={`flex items-center px-4 py-2 rounded-lg border shadow-sm transition font-bold focus:outline-none focus:ring-2 ${
-                  selectedStatus === "red" 
-                    ? "ring-red-400 bg-red-200" 
-                    : "bg-red-100 hover:bg-red-200 border-red-300 text-red-800"
-                }`}
-              >
-                <span className="mr-2 text-lg">🔴</span> {metrics.red} Red
-              </button>
-
-              {selectedStatus && (
-                <div
-                  className="absolute left-0 mt-2 z-20 w-full max-w-md bg-white rounded-lg shadow-lg border border-gray-200"
-                  style={{ top: "100%" }}
+          {/* AI Analysis & Recommendations Section */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 border border-blue-200 shadow-sm mt-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900 tracking-tight">
+                AI Analysis & Recommendations
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setAiPage(p => Math.max(0, p - 1))}
+                  disabled={aiPage === 0}
+                  className={`p-2 rounded-full border ${aiPage === 0 ? 'bg-gray-100 text-gray-400' : 'bg-white hover:bg-blue-50 text-blue-600'}`}
+                  aria-label="Previous"
                 >
-                  <div className="flex items-center justify-between px-4 py-3 border-b">
-                    <span className="font-semibold capitalize text-gray-800">
-                      {selectedStatus} Projects ({filteredProjects.length})
-                    </span>
-                    <button 
-                      onClick={() => setSelectedStatus(null)} 
-                      className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                      </svg>
-                    </button>
-                  </div>
-                  <ul className="max-h-64 overflow-y-auto divide-y divide-gray-100">
-                    {filteredProjects.length > 0 ? (
-                      filteredProjects.map((project) => (
-                        <li
-                          key={project.projectId}
-                          className={`flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition ${
-                            selectedStatus === "green" ? "bg-green-50" :
-                            selectedStatus === "amber" ? "bg-yellow-50" : 
-                            selectedStatus === "red" ? "bg-red-50" : "bg-gray-50"
+                  <ChevronLeft />
+                </button>
+                <span className="text-sm font-medium">{PAGINATION_STEPS[aiPage].label}</span>
+                <button
+                  onClick={() => setAiPage(p => Math.min(PAGINATION_STEPS.length - 1, p + 1))}
+                  disabled={aiPage === PAGINATION_STEPS.length - 1}
+                  className={`p-2 rounded-full border ${aiPage === PAGINATION_STEPS.length - 1 ? 'bg-gray-100 text-gray-400' : 'bg-white hover:bg-blue-50 text-blue-600'}`}
+                  aria-label="Next"
+                >
+                  <ChevronRight />
+                </button>
+              </div>
+            </div>
+            <div>
+              {aiPage === 0 && (
+                <div className="bg-blue-50/70 p-4 rounded-lg border border-blue-200 shadow-sm">
+                  <span className="font-semibold text-blue-700 text-lg flex items-center gap-2">
+                    📊 Organization Assessment
+                    <span className="ml-2 px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-xs font-bold">Step 1</span>
+                  </span>
+                  {cleanText(currentAssessment?.llmOrgAssessmentDescription).length > 0 ? (
+                    <ul className="mt-3 ml-6 text-gray-700 list-disc space-y-2 text-base">
+                      {cleanText(currentAssessment?.llmOrgAssessmentDescription).map((line, i) => (
+                        <li key={i} className="font-medium">
+                          <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-2 align-middle"></span>
+                          <span className="align-middle">{line}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-gray-500 mt-3 ml-6">No assessment available.</div>
+                  )}
+                </div>
+              )}
+              {aiPage === 1 && (
+                <div className="bg-red-50/70 p-4 rounded-lg border border-red-200 shadow-sm">
+                  <span className="font-semibold text-red-700 text-lg flex items-center gap-2">
+                    ⚠️ Key Risks
+                    <span className="ml-2 px-2 py-0.5 rounded bg-red-100 text-red-800 text-xs font-bold">Step 2</span>
+                  </span>
+                  {cleanText(currentAssessment?.keyRisks).length > 0 ? (
+                    <ul className="mt-3 ml-6 text-gray-700 list-disc space-y-2 text-base">
+                      {cleanText(currentAssessment?.keyRisks).map((risk, i) => (
+                        <li key={i} className="font-medium">
+                          <span className="inline-block w-2 h-2 bg-red-500 rounded-full mr-2 align-middle"></span>
+                          <span className="align-middle">{risk}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-gray-500 mt-3 ml-6">No key risks available.</div>
+                  )}
+                </div>
+              )}
+              {aiPage === 2 && (
+                <div className="bg-green-50/70 p-4 rounded-lg border border-green-200 shadow-sm">
+                  <span className="font-semibold text-green-700 text-lg flex items-center gap-2">
+                    💡 Recommendations
+                    <span className="ml-2 px-2 py-0.5 rounded bg-green-100 text-green-800 text-xs font-bold">Step 3</span>
+                  </span>
+                  {cleanText(currentAssessment?.recommendedActions).length > 0 ? (
+                    <ul className="mt-3 ml-6 text-gray-700 list-disc space-y-2 text-base">
+                      {cleanText(currentAssessment?.recommendedActions).map((action, i) => (
+                        <li key={i} className="font-medium">
+                          <span className="inline-block w-2 h-2 bg-green-500 rounded-full mr-2 align-middle"></span>
+                          <span className="align-middle">{action}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-gray-500 mt-3 ml-6">No recommendations available.</div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="flex justify-center mt-6 gap-2">
+              {PAGINATION_STEPS.map((step, idx) => (
+                <button
+                  key={step.key}
+                  onClick={() => setAiPage(idx)}
+                  className={`w-3 h-3 rounded-full border-2 transition ${aiPage === idx ? 'bg-blue-600 border-blue-600' : 'bg-gray-200 border-gray-300'}`}
+                  aria-label={`Go to step ${idx + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+          <br></br>
+
+          <div className="flex flex-wrap items-center gap-3 mb-4 relative" ref={statusDropdownRef}>
+            <button
+              onClick={() => handleStatusClick("green")}
+              className={`flex items-center px-4 py-2 rounded-lg border shadow-sm transition font-bold focus:outline-none focus:ring-2 ${
+                selectedStatus === "green" 
+                  ? "ring-green-400 bg-green-200" 
+                  : "bg-green-100 hover:bg-green-200 border-green-300 text-green-800"
+              }`}
+            >
+              <span className="mr-2 text-lg">🟢</span> {metrics.green} Green
+            </button>
+            <button
+              onClick={() => handleStatusClick("amber")}
+              className={`flex items-center px-4 py-2 rounded-lg border shadow-sm transition font-bold focus:outline-none focus:ring-2 ${
+                selectedStatus === "amber" 
+                  ? "ring-yellow-400 bg-yellow-200" 
+                  : "bg-yellow-100 hover:bg-yellow-200 border-yellow-300 text-yellow-800"
+              }`}
+            >
+              <span className="mr-2 text-lg">🟡</span> {metrics.amber} Amber
+            </button>
+            <button
+              onClick={() => handleStatusClick("red")}
+              className={`flex items-center px-4 py-2 rounded-lg border shadow-sm transition font-bold focus:outline-none focus:ring-2 ${
+                selectedStatus === "red" 
+                  ? "ring-red-400 bg-red-200" 
+                  : "bg-red-100 hover:bg-red-200 border-red-300 text-red-800"
+              }`}
+            >
+              <span className="mr-2 text-lg">🔴</span> {metrics.red} Red
+            </button>
+
+            {selectedStatus && (
+              <div
+                className="absolute left-0 mt-2 z-20 w-full max-w-md bg-white rounded-lg shadow-lg border border-gray-200"
+                style={{ top: "100%" }}
+              >
+                <div className="flex items-center justify-between px-4 py-3 border-b">
+                  <span className="font-semibold capitalize text-gray-800">
+                    {selectedStatus} Projects ({filteredProjects.length})
+                  </span>
+                  <button 
+                    onClick={() => setSelectedStatus(null)} 
+                    className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                </div>
+                <ul className="max-h-64 overflow-y-auto divide-y divide-gray-100">
+                  {filteredProjects.length > 0 ? (
+                    filteredProjects.map((project) => (
+                      <li
+                        key={project.projectId}
+                        className={`flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition ${
+                          selectedStatus === "green" ? "bg-green-50" :
+                          selectedStatus === "amber" ? "bg-yellow-50" : 
+                          selectedStatus === "red" ? "bg-red-50" : "bg-gray-50"
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-gray-700">{project.projectName}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {project.account} • {project.tower}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (!project.projectId) {
+                              console.error("Missing projectId for:", project.projectName);
+                              return;
+                            }
+                            setLocation(`/projects/${project.projectId}`, {
+                              state: { from: 'dashboard' }
+                            });
+                          }}
+                          className={`ml-4 px-3 py-1.5 rounded-lg text-xs font-semibold transition text-white flex items-center ${
+                            selectedStatus === "green" 
+                              ? "bg-green-600 hover:bg-green-700" 
+                              : selectedStatus === "amber" 
+                                ? "bg-yellow-500 hover:bg-yellow-600" 
+                                : "bg-red-600 hover:bg-red-700"
                           }`}
                         >
-                          <div className="min-w-0">
-                            <p className="truncate font-medium text-gray-700">{project.projectName}</p>
-                            <p className="text-xs text-gray-500 mt-1">
-                              {project.account} • {project.tower}
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => {
-                              if (!project.projectId) {
-                                console.error("Missing projectId for:", project.projectName);
-                                return;
-                              }
-                              setLocation(`/projects/${project.projectId}`, {
-                                state: { from: 'dashboard' }
-                              });
-                            }}
-                            className={`ml-4 px-3 py-1.5 rounded-lg text-xs font-semibold transition text-white flex items-center ${
-                              selectedStatus === "green" 
-                                ? "bg-green-600 hover:bg-green-700" 
-                                : selectedStatus === "amber" 
-                                  ? "bg-yellow-500 hover:bg-yellow-600" 
-                                  : "bg-red-600 hover:bg-red-700"
-                            }`}
-                          >
-                            View
-                            <ChevronRight className="h-3 w-3 ml-1" />
-                          </button>
-                        </li>
-                      ))
-                    ) : (
-                      <li className="px-4 py-4 text-center text-gray-400 text-sm">
-                        No projects in this status category
+                          View
+                          <ChevronRight className="h-3 w-3 ml-1" />
+                        </button>
                       </li>
-                    )}
-                  </ul>
-                </div>
-              )}
-            </div>
+                    ))
+                  ) : (
+                    <li className="px-4 py-4 text-center text-gray-400 text-sm">
+                      No projects in this status category
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
 
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
-              <p className="text-xs text-indigo-600 font-medium">
-                Continuously learning from your project patterns
-              </p>
-            </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
+            <p className="text-xs text-indigo-600 font-medium">
+              Continuously learning from your project patterns
+            </p>
           </div>
         </div>
       </div>

@@ -34,11 +34,22 @@ import { useAuth } from "@/hooks/use-auth";
 import { USER_ROLES } from "@/lib/constants";
 import type { Project, WeeklyStatusReport } from "@shared/schema";
 
+const PEOPLE = [
+  { name: "Raja", value: "Raja", level: "DELIVERY_MANAGER" },
+  { name: "Ani", value: "Ani", level: "DELIVERY_MANAGER" },
+  { name: "Vijo Jacob", value: "Vijo Jacob", level: "PROJECT_MANAGER" },
+  { name: "Yamuna Rani M", value: "Yamuna Rani M", level: "PROJECT_MANAGER" },
+  { name: "Ashwathy Nair", value: "Ashwathy Nair", level: "PROJECT_MANAGER" },
+  { name: "Shanavaz A", value: "Shanavaz A", level: "PROJECT_MANAGER" },
+  { name: "ORG Head", value: "ORG Head", level: "ORG_HEAD" }
+];
+
 export default function Dashboard() {
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [importanceFilter, setImportanceFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [selectedPerson, setSelectedPerson] = useState(PEOPLE[0]);
 
   const { user } = useAuth();
 
@@ -225,7 +236,8 @@ export default function Dashboard() {
 
   return (
     <div className="bg-gray-50 min-h-full">
-      <AIAssessmentHeader />
+      {/* Pass selectedPerson and onPersonChange to AIAssessmentHeader if needed */}
+      <AIAssessmentHeader selectedPerson={selectedPerson} onPersonChange={setSelectedPerson} />
 
       <div className="max-w-7xl mx-auto p-8">
         {/* Header with filters */}
@@ -247,7 +259,7 @@ export default function Dashboard() {
           {/* Left Column - Analytics and Priority Projects */}
           <div className="xl:col-span-2 space-y-8">
             {/* Analytics Overview */}
-            <AnalyticsOverview />
+            <AnalyticsOverview selectedPerson={selectedPerson} />
           </div>
 
           {/* Right Column - Quick Actions */}
