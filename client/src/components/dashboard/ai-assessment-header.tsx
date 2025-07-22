@@ -349,7 +349,7 @@ export function AIAssessmentHeader({
     
     setIsGenerating(true);
     try {
-      const response = await fetch("http://34.63.198.88:8080/api/organizational-assessments/generate", {
+      const response = await fetch("http://34.63.198.88/api/organizational-assessments/generate", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
