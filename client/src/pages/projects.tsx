@@ -468,7 +468,14 @@ export default function Projects() {
   const [, setLocation] = useLocation();
 
   const { data: projects, isLoading: projectsLoading } = useQuery<ExternalProject[]>({
-    queryKey: ["/api/projects/external"],
+    queryKey: ["projects"],
+    queryFn: async () => {
+      const response = await fetch("http://34.63.198.88/api/projects/");
+      if (!response.ok) {
+        throw new Error('Failed to fetch projects');
+      }
+      return response.json();
+    }
   });
 
   const filteredProjects = projects?.filter((project) => {

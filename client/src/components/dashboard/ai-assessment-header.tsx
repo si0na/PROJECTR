@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Bot, Activity, Star, ChevronRight, AlertCircle, RefreshCw } from "lucide-react";
+import { Bot, Activity, Star, ChevronRight, AlertCircle, RefreshCw, ChevronDown } from "lucide-react";
 import React from "react";
 import { useLocation } from "wouter";
 
@@ -69,7 +69,7 @@ interface Assessment {
   recommendedActions: string;
   escalationNeeded: boolean;
   escalationsCount: number;
-  overallHealthScore: number;
+  overallHealthScore: number | null;
   createdAt: string;
   updatedAt: string;
   trends: {
@@ -116,11 +116,40 @@ interface StrategicProjectsData {
 
 type StatusType = "green" | "amber" | "red" | "error";
 
-export function AIAssessmentHeader() {
+interface Manager {
+  name: string;
+  value: string;
+}
+
+const DELIVERY_MANAGERS: Manager[] = [
+  { name: "Raja", value: "Raja" },
+  { name: "Ani", value: "Ani" }
+];
+
+interface AIAssessmentHeaderProps {
+  selectedManager?: Manager;
+  onManagerChange?: (manager: Manager) => void;
+}
+
+export function AIAssessmentHeader({ 
+  selectedManager: propSelectedManager, 
+  onManagerChange 
+}: AIAssessmentHeaderProps) {
+  const [internalSelectedManager, setInternalSelectedManager] = React.useState(DELIVERY_MANAGERS[0]);
+  const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+  const [, setLocation] = useLocation();
+  const [selectedStatus, setSelectedStatus] = React.useState<StatusType | null>(null);
+  const statusDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  const selectedManager = propSelectedManager || internalSelectedManager;
+
   const { data: assessments, isLoading, error, refetch } = useQuery<Assessment[]>({
-    queryKey: ["assessments"],
+    queryKey: ["assessments", selectedManager.value],
     queryFn: async () => {
-      const response = await fetch("http://34.63.198.88/api/organizational-assessments/dashboard");
+      const response = await fetch(
+        `http://34.63.198.88/api/organizational-assessments/dashboard?assessedPersonName=${selectedManager.value}&assessmentLevel=DELIVERY_MANAGER`
+      );
       
       if (!response.ok) {
         const text = await response.text();
@@ -140,15 +169,10 @@ export function AIAssessmentHeader() {
     retry: 2
   });
 
-  const [, setLocation] = useLocation();
-  const [selectedStatus, setSelectedStatus] = React.useState<StatusType | null>(null);
-  const dropdownRef = React.useRef<HTMLDivElement>(null);
-
-  // Get the most recent assessment (Raja's assessment)
   const currentAssessment = React.useMemo(() => {
     if (!assessments || assessments.length === 0) return null;
-    return assessments.find(a => a.assessedPersonName === "Raja") || assessments[0];
-  }, [assessments]);
+    return assessments.find(a => a.assessedPersonName === selectedManager.value) || assessments[0];
+  }, [assessments, selectedManager]);
 
   const analysis = React.useMemo<PortfolioAnalysis | null>(() => {
     if (!currentAssessment) return null;
@@ -175,7 +199,6 @@ export function AIAssessmentHeader() {
       };
     }
 
-    // Handle both "strategic" and "strategic " (with space) keys
     const strategicGroup = 
       currentAssessment.projectsSummary.importanceGroups.strategic ||
       currentAssessment.projectsSummary.importanceGroups["strategic "];
@@ -188,7 +211,6 @@ export function AIAssessmentHeader() {
       };
     }
 
-    // Filter out the error status and count all other statuses
     const filteredStatusCounts = Object.entries(strategicGroup).reduce((acc, [status, count]) => {
       if (status.toLowerCase() !== "error") {
         acc[status] = count;
@@ -242,6 +264,41 @@ export function AIAssessmentHeader() {
     }
   };
 
+  const getHealthScoreDisplay = (score: number | null): { 
+    value: string; 
+    color: { bg: string; border: string; text: string }; 
+    gradient: string;
+    showScore: boolean;
+  } => {
+    if (score === null) {
+    return {
+      value: "N/A",
+      color: { bg: "from-gray-50 to-gray-100", border: "border-gray-200", text: "text-gray-500" },
+      gradient: "from-gray-400 to-gray-500",
+      showScore: false
+    };
+  }
+    
+    if (score > 5) return { 
+      value: score.toString(),
+      color: { bg: "from-green-50 to-emerald-50", border: "border-green-200", text: "text-green-600" },
+      gradient: "from-green-500 to-emerald-500",
+      showScore: true
+    };
+    if (score === 5) return { 
+      value: score.toString(),
+      color: { bg: "from-amber-50 to-yellow-50", border: "border-amber-200", text: "text-amber-600" },
+      gradient: "from-amber-500 to-yellow-500",
+      showScore: true
+    };
+    return { 
+      value: score.toString(),
+      color: { bg: "from-red-50 to-rose-50", border: "border-red-200", text: "text-red-600" },
+      gradient: "from-red-500 to-rose-500",
+      showScore: true
+    };
+  };
+
   const formatDate = (dateString: string): string => {
     try {
       const date = new Date(dateString);
@@ -256,12 +313,6 @@ export function AIAssessmentHeader() {
     }
   };
 
-  const navigateToProject = (projectId: number) => {
-    setLocation(`/projects/${projectId}`, {
-      state: { from: 'dashboard' }
-    });
-  };
-
   const handleStatusClick = (status: StatusType) => {
     setSelectedStatus(selectedStatus === status ? null : status);
   };
@@ -270,21 +321,30 @@ export function AIAssessmentHeader() {
     refetch();
   };
 
+  const handleManagerSelect = (manager: Manager) => {
+    if (onManagerChange) {
+      onManagerChange(manager);
+    } else {
+      setInternalSelectedManager(manager);
+    }
+    setIsDropdownOpen(false);
+  };
+
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
         setSelectedStatus(null);
       }
     }
 
-    if (selectedStatus) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [selectedStatus]);
+  }, []);
 
   if (isLoading) {
     return (
@@ -344,12 +404,40 @@ export function AIAssessmentHeader() {
 
   const metrics = analysis?.metrics || { green: 0, amber: 0, red: 0, error: 0 };
   const totalProjects = currentAssessment.projectsSummary?.total || 0;
+  const healthScoreDisplay = getHealthScoreDisplay(currentAssessment.overallHealthScore);
 
   return (
     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-b border-blue-100 p-8">
       <div className="max-w-7xl mx-auto">
-        {/* Top Generate Assessment Button */}
-        <div className="flex justify-end mb-4">
+        <div className="flex justify-between mb-4">
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="flex items-center px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-lg shadow-sm transition font-medium border border-gray-300"
+            >
+              {selectedManager.name}
+              <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${isDropdownOpen ? 'transform rotate-180' : ''}`} />
+            </button>
+            {isDropdownOpen && (
+              <div className="absolute z-10 mt-1 w-full bg-white rounded-lg shadow-lg border border-gray-200">
+                <ul className="py-1">
+                  {DELIVERY_MANAGERS.map((manager) => (
+                    <li key={manager.value}>
+                      <button
+                        onClick={() => handleManagerSelect(manager)}
+                        className={`w-full text-left px-4 py-2 hover:bg-blue-50 ${
+                          selectedManager.value === manager.value ? 'bg-blue-100 text-blue-700' : 'text-gray-700'
+                        }`}
+                      >
+                        {manager.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          
           <button
             onClick={handleGenerateAssessment}
             className="flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition font-medium"
@@ -411,14 +499,19 @@ export function AIAssessmentHeader() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4 border-2 border-green-200">
+            <div className={`bg-gradient-to-br ${healthScoreDisplay.color.bg} rounded-lg p-4 border-2 ${healthScoreDisplay.color.border}`}>
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg flex items-center justify-center shadow-sm">
+                <div className={`w-10 h-10 bg-gradient-to-r ${healthScoreDisplay.gradient} rounded-lg flex items-center justify-center shadow-sm`}>
                   <Activity className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <p className="font-bold text-lg text-gray-900">{currentAssessment.overallHealthScore}</p>
+                  <p className={`font-bold text-lg ${healthScoreDisplay.color.text}`}>
+                    {healthScoreDisplay.value}
+                  </p>
                   <p className="text-sm text-gray-600">Overall Health Score</p>
+                  {!healthScoreDisplay.showScore && (
+                    <p className="text-xs text-gray-500 mt-1">Score not calculated</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -434,7 +527,7 @@ export function AIAssessmentHeader() {
               </div>
               <h3 className="font-semibold text-gray-900">AI Analysis & Recommendations</h3>
               <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded-full">
-                {currentAssessment.assessedPersonName}'s Assessment
+                {selectedManager.name}'s Assessment
               </span>
             </div>
 
@@ -494,7 +587,7 @@ export function AIAssessmentHeader() {
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 mb-4 relative">
+            <div className="flex flex-wrap items-center gap-3 mb-4 relative" ref={statusDropdownRef}>
               <button
                 onClick={() => handleStatusClick("green")}
                 className={`flex items-center px-4 py-2 rounded-lg border shadow-sm transition font-bold focus:outline-none focus:ring-2 ${
@@ -528,7 +621,6 @@ export function AIAssessmentHeader() {
 
               {selectedStatus && (
                 <div
-                  ref={dropdownRef}
                   className="absolute left-0 mt-2 z-20 w-full max-w-md bg-white rounded-lg shadow-lg border border-gray-200"
                   style={{ top: "100%" }}
                 >
@@ -604,9 +696,6 @@ export function AIAssessmentHeader() {
             </div>
           </div>
         </div>
-
-        {/* Bottom Generate Assessment Button */}
-        
       </div>
     </div>
   );

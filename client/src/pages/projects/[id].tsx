@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { ArrowLeft, Info, ClipboardList, AlertTriangle, CheckCircle, RefreshCw, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -8,7 +8,6 @@ interface LocationState {
   previousPath?: string;
 }
 
-// Type definitions based on your actual API response
 interface ExternalProject {
   projectId: number;
   projectName: string;
@@ -103,15 +102,11 @@ const parseActionItemsToTasks = (actionItems: string): Array<{task: string, prio
 
 export default function ProjectDetailsPage() {
   const [location, navigate] = useLocation();
-  
-  // Get the project ID from the URL
-  const pathSegments = window.location.pathname.split("/");
+  const pathSegments = location.split("/");
   const id = pathSegments[pathSegments.length - 1];
 
-  // Get navigation state from browser history
   const getNavigationState = (): LocationState => {
     try {
-      // Check if we have state from navigation
       const historyState = window.history.state;
       if (historyState && typeof historyState === 'object') {
         return historyState as LocationState;
@@ -124,9 +119,8 @@ export default function ProjectDetailsPage() {
 
   const navigationState = getNavigationState();
 
-  // Determine back path with multiple fallback strategies
   const getBackPath = (): { path: string; label: string } => {
-    // Strategy 1: Check navigation state
+    // First check explicit navigation state
     if (navigationState?.from === 'dashboard') {
       return { path: '/', label: 'Dashboard' };
     }
@@ -134,69 +128,33 @@ export default function ProjectDetailsPage() {
       return { path: '/projects', label: 'Projects' };
     }
     if (navigationState?.previousPath) {
-      const label = navigationState.previousPath === '/' ? 'Dashboard' : 'Projects';
-      return { path: navigationState.previousPath, label };
+      return { 
+        path: navigationState.previousPath, 
+        label: navigationState.previousPath === '/' ? 'Dashboard' : 'Projects' 
+      };
     }
 
-    // Strategy 2: Check document referrer
-    if (document.referrer) {
-      try {
-        const referrerUrl = new URL(document.referrer);
-        const referrerPath = referrerUrl.pathname;
-        
-        if (referrerPath === '/' || referrerPath === '/dashboard') {
-          return { path: '/', label: 'Dashboard' };
-        }
-        if (referrerPath === '/projects' || referrerPath.startsWith('/projects')) {
-          return { path: '/projects', label: 'Projects' };
-        }
-      } catch (error) {
-        console.warn('Could not parse referrer URL:', error);
-      }
-    }
-
-    // Strategy 3: Check browser history length and URL patterns
-    if (window.history.length > 1) {
-      // If we have history, try to go back
-      if (location.includes('/projects/')) {
-        // We're likely in a project detail page, so projects list is a safe bet
-        return { path: '/projects', label: 'Projects' };
-      }
-    }
-
-    // Strategy 4: Default fallback based on URL structure
-    if (location.includes('/projects/')) {
-      return { path: '/projects', label: 'Projects' };
-    }
-
-    // Final fallback to dashboard
-    return { path: '/', label: 'Dashboard' };
+    // Default to projects page if no history state is available
+    return { path: '/projects', label: 'Projects' };
   };
 
   const { path: backPath, label: backLabel } = getBackPath();
 
-  // Enhanced back navigation handler
-  const handleBackNavigation = (e: React.MouseEvent) => {
+const handleBackNavigation = (e: React.MouseEvent) => {
     e.preventDefault();
-    
-    try {
-      // If we have a reliable history state, use browser back
-      if (navigationState?.from && window.history.length > 1) {
-        window.history.back();
-        return;
-      }
-      
-      // Otherwise, navigate to the determined path
-      navigate(backPath);
-    } catch (error) {
-      console.warn('Navigation error:', error);
-      // Fallback to direct navigation
-      navigate(backPath);
-    }
+    navigate(backPath);  // Use the navigate function from useLocation
   };
 
   const { data: projects, isLoading: projectsLoading } = useQuery<ExternalProject[]>({
-    queryKey: ["/api/projects/external"],
+    queryKey: ["projects"],
+    queryFn: async () => {
+      const response = await fetch("http://34.63.198.88/api/projects/");
+      if (!response.ok) {
+        throw new Error('Failed to fetch projects');
+      }
+      return response.json();
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes cache
   });
 
   const project = projects?.find(p => 
@@ -213,7 +171,6 @@ export default function ProjectDetailsPage() {
     ? project.projectReviews.sort((a, b) => new Date(b.reviewDate).getTime() - new Date(a.reviewDate).getTime())[0]
     : null;
 
-  // Enhanced RAG status visualization
   const llmAiStatus = latestStatus?.llmAiStatus || 'Unknown';
   const ragConfig = {
     'Green': {
@@ -273,7 +230,6 @@ export default function ProjectDetailsPage() {
     iconComponent: StatusIcon,
   } = ragConfig[llmAiStatus as keyof typeof ragConfig] || ragConfig['Unknown'];
 
-  // Parse data
   const updateSummary = collectAllStatusValues(project?.projectStatuses, 'keyWeeklyUpdates');
   const issues = collectAllStatusValues(project?.projectStatuses, 'issuesChallenges');
   const mitigation = collectAllStatusValues(project?.projectStatuses, 'planForGreen');
@@ -304,7 +260,6 @@ export default function ProjectDetailsPage() {
       details: s.clientEscalationDetails
     })) || [];
 
-  // Render back button component
   const renderBackButton = () => (
     <button
       onClick={handleBackNavigation}
@@ -341,7 +296,6 @@ export default function ProjectDetailsPage() {
 
   return (
     <div className={`min-h-[calc(100vh-0px)] w-full flex flex-col items-stretch ${bg} animate-fade-in`}>
-      {/* Status Header with improved back button */}
       <div className={`sticky top-0 z-20 ${headerBg} py-4 px-2 sm:px-6 md:px-12 lg:px-24 xl:px-32 shadow-sm flex items-center border-b ${border}`}>
         {renderBackButton()}
         
@@ -381,7 +335,7 @@ export default function ProjectDetailsPage() {
             </div>
           </div>
 
-          {/* Critical Issues Section - Only shown for Red status */}
+          {/* Critical Issues Section */}
           {llmAiStatus === 'Red' && (
             <div className={`rounded-2xl border-l-4 ${border} ${bg} p-5 shadow-sm`}>
               <h3 className={`font-bold flex items-center ${text} mb-3`}>
