@@ -26,7 +26,7 @@ export async function apiRequest(
 type UnauthorizedBehavior = "returnNull" | "throw";
 
 export async function externalApiRequest(endpoint: string) {
-  const url = `http://34.63.198.88:8080${endpoint}`;
+  const url = `http://34.63.198.88${endpoint}`;
   console.log('Fetching from external API:', url);
   
   try {

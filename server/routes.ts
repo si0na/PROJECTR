@@ -82,7 +82,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/projects', requireAuth, async (req: Request, res: Response) => {
     try {
       console.log('Proxying request to external API...');
-      const response = await fetch('http://34.63.198.88:8080/api/projects/');
+      const response = await fetch('http://34.63.198.88/api/projects/');
       
       if (!response.ok) {
         throw new Error(`External API error: ${response.status} ${response.statusText}`);

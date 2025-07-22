@@ -197,7 +197,7 @@ export default function ProjectDetailsPage() {
   };
 
   const { data: projects, isLoading: projectsLoading } = useQuery<ExternalProject[]>({
-    queryKey: ["/api/projects/external"],
+    queryKey: ["/api/projects/external/"],
   });
 
   const project = projects?.find(p => 

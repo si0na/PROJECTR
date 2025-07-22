@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from "recharts";
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from "recharts";
 import { TrendingUp } from "lucide-react";
 import { externalApiRequest } from "@/lib/queryClient";
 
@@ -29,14 +29,6 @@ interface ChartData {
   total: number;
 }
 
-interface RAGStatus {
-  greenPercentage: number;
-  amberPercentage: number;
-  redPercentage: number;
-  totalValidProjects: number;
-  totalProjects: number;
-}
-
 export function AnalyticsOverview() {
   const { data: assessments, isLoading, error } = useQuery<Assessment[]>({
     queryKey: ['organizational-assessments'],
@@ -46,7 +38,7 @@ export function AnalyticsOverview() {
   // Get Assessment ID 5 data
   const assessment5 = assessments?.find(a => a.assessmentId === 5);
 
-  // Transform data for chart - always returns at least one data point
+  // Transform data for chart
   const getChartData = (): ChartData[] => {
     if (!assessment5) return [];
 
@@ -61,7 +53,7 @@ export function AnalyticsOverview() {
       }));
     }
 
-    // Default to showing current assessment data (even if zeros)
+    // Default to showing current assessment data
     return [{
       date: assessment5.assessmentDate,
       Green: assessment5.greenProjects,
@@ -71,24 +63,8 @@ export function AnalyticsOverview() {
     }];
   };
 
-  // Calculate RAG status percentages
-  const getAssessment5RAGStatus = (): RAGStatus | null => {
-    if (!assessment5) return null;
-
-    const totalValidProjects = assessment5.totalProjects - (assessment5.errorProjects || 0);
-    if (totalValidProjects <= 0) return null;
-
-    return {
-      greenPercentage: (assessment5.greenProjects / totalValidProjects) * 100,
-      amberPercentage: (assessment5.amberProjects / totalValidProjects) * 100,
-      redPercentage: (assessment5.redProjects / totalValidProjects) * 100,
-      totalValidProjects,
-      totalProjects: assessment5.totalProjects
-    };
-  };
-
   const chartData = getChartData();
-  const ragStatus = getAssessment5RAGStatus();
+  const hasData = assessment5 && (assessment5.totalProjects > 0 || (assessment5.trends && assessment5.trends.length > 0));
 
   if (isLoading) {
     return (
@@ -122,7 +98,7 @@ export function AnalyticsOverview() {
             <TrendingUp className="h-5 w-5 text-green-600" />
           </div>
           <h3 className="text-2xl font-bold text-gray-900 tracking-tight">
-            Project Health Trends {assessment5 ? `(Assessment ID 5)` : ''}
+            Project Health Trends 
           </h3>
         </div>
 
@@ -130,10 +106,10 @@ export function AnalyticsOverview() {
           <div className="h-96 flex items-center justify-center text-gray-500">
             <p>Assessment ID 5 not found</p>
           </div>
-        ) : (
+        ) : hasData ? (
           <div className="h-96 flex items-center justify-center">
             <ResponsiveContainer width="95%" height="100%">
-              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+              <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis 
                   dataKey="date"
@@ -163,67 +139,48 @@ export function AnalyticsOverview() {
                   height={36}
                   wrapperStyle={{ paddingBottom: '20px' }}
                 />
-                <Bar 
+                <Line 
+                  type="monotone" 
                   dataKey="Green" 
                   name="Green" 
-                  fill="#10b981" 
-                  radius={[4, 4, 0, 0]}
+                  stroke="#10b981" 
+                  strokeWidth={3} 
+                  dot={{ r: 5 }} 
+                  activeDot={{ r: 8 }} 
                 />
-                <Bar 
+                <Line 
+                  type="monotone" 
                   dataKey="Amber" 
                   name="Amber" 
-                  fill="#f59e0b" 
-                  radius={[4, 4, 0, 0]}
+                  stroke="#f59e0b" 
+                  strokeWidth={3} 
+                  dot={{ r: 5 }} 
+                  activeDot={{ r: 8 }} 
                 />
-                <Bar 
+                <Line 
+                  type="monotone" 
                   dataKey="Red" 
                   name="Red" 
-                  fill="#ef4444" 
-                  radius={[4, 4, 0, 0]}
+                  stroke="#ef4444" 
+                  strokeWidth={3} 
+                  dot={{ r: 5 }} 
+                  activeDot={{ r: 8 }} 
                 />
-              </BarChart>
+              </LineChart>
             </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="h-96 flex items-center justify-center text-gray-500">
+            <p>No project status data available for Assessment ID 5</p>
           </div>
         )}
 
-        {assessment5 && assessment5.totalProjects === 0 ? (
-          <div className="mt-8 p-6 bg-yellow-50 rounded-xl border border-yellow-200">
-            <h4 className="font-medium text-gray-900 mb-2 text-lg">Assessment Status</h4>
-            <p className="text-yellow-700">No projects recorded in this assessment</p>
-          </div>
-        ) : ragStatus ? (
-          <div className="mt-8 p-6 bg-white rounded-xl border border-gray-200 shadow-sm">
-            <h4 className="font-medium text-gray-900 mb-4 text-lg">Assessment ID 5 Status Breakdown</h4>
-            <p className="text-sm text-gray-600 mb-4">
-              Showing valid projects only (excluding error status). Based on {ragStatus.totalValidProjects} projects.
-            </p>
-            
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-green-50 rounded-lg border border-green-100">
-                <p className="text-3xl font-bold text-green-600">{ragStatus.greenPercentage.toFixed(1)}%</p>
-                <p className="text-sm font-medium text-green-800 mt-1">Green</p>
-                <p className="text-xs text-green-600 mt-1">({Math.round(ragStatus.greenPercentage * ragStatus.totalValidProjects / 100)} projects)</p>
-              </div>
-              <div className="text-center p-4 bg-amber-50 rounded-lg border border-amber-100">
-                <p className="text-3xl font-bold text-amber-600">{ragStatus.amberPercentage.toFixed(1)}%</p>
-                <p className="text-sm font-medium text-amber-800 mt-1">Amber</p>
-                <p className="text-xs text-amber-600 mt-1">({Math.round(ragStatus.amberPercentage * ragStatus.totalValidProjects / 100)} projects)</p>
-              </div>
-              <div className="text-center p-4 bg-red-50 rounded-lg border border-red-100">
-                <p className="text-3xl font-bold text-red-600">{ragStatus.redPercentage.toFixed(1)}%</p>
-                <p className="text-sm font-medium text-red-800 mt-1">Red</p>
-                <p className="text-xs text-red-600 mt-1">({Math.round(ragStatus.redPercentage * ragStatus.totalValidProjects / 100)} projects)</p>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
         {assessment5 && (
           <div className="mt-4 text-sm text-gray-600">
-            <p>Assessment date: {new Date(assessment5.assessmentDate).toLocaleDateString()}</p>
-            {assessment5.totalProjects > 0 && (
-              <p className="mt-1">Tracking {assessment5.totalProjects} projects</p>
-            )}
+            <p>Tracking RAG status across {assessment5.totalProjects} projects using assessment data.</p>
+            <p className="mt-1">
+              Latest assessment: {new Date(assessment5.assessmentDate).toLocaleDateString()}
+            </p>
           </div>
         )}
       </div>

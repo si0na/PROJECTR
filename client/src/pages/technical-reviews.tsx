@@ -70,7 +70,7 @@ export default function TechnicalReviews() {
   });
 
   const { data: projects } = useQuery<Project[]>({
-    queryKey: ["/api/projects/external"],
+    queryKey: ["/api/projects/external/"],
   });
 
   const reviewTypes = [
