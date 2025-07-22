@@ -32,10 +32,9 @@ interface ProjectStatus {
   deliveryModel: string;
   clientEscalation: boolean;
   clientEscalationDetails: string | null;
-  ragStatus: string;
+  llmAiStatus: string;
   keyWeeklyUpdates: string;
   weeklyUpdateColumn: string;
-  llmAiStatus: string;
   llmAiAssessmentDescription: string;
   planForNextWeek: string;
   issuesChallenges: string;
@@ -197,7 +196,7 @@ export default function ProjectDetailsPage() {
   };
 
   const { data: projects, isLoading: projectsLoading } = useQuery<ExternalProject[]>({
-    queryKey: ["/api/projects/external/"],
+    queryKey: ["/api/projects/external"],
   });
 
   const project = projects?.find(p => 
@@ -215,7 +214,7 @@ export default function ProjectDetailsPage() {
     : null;
 
   // Enhanced RAG status visualization
-  const ragStatus = latestStatus?.ragStatus || 'Unknown';
+  const llmAiStatus = latestStatus?.llmAiStatus || 'Unknown';
   const ragConfig = {
     'Green': {
       bg: 'bg-green-50',
@@ -272,7 +271,7 @@ export default function ProjectDetailsPage() {
     headerBg,
     shadow,
     iconComponent: StatusIcon,
-  } = ragConfig[ragStatus as keyof typeof ragConfig] || ragConfig['Unknown'];
+  } = ragConfig[llmAiStatus as keyof typeof ragConfig] || ragConfig['Unknown'];
 
   // Parse data
   const updateSummary = collectAllStatusValues(project?.projectStatuses, 'keyWeeklyUpdates');
@@ -348,7 +347,7 @@ export default function ProjectDetailsPage() {
         
         <div className={`ml-auto px-4 py-2 rounded-full ${bg} border ${border} ${text} font-bold flex items-center`}>
           <StatusIcon className={`h-5 w-5 mr-2 ${icon}`} />
-          {ragStatus}
+          {llmAiStatus}
         </div>
       </div>
 
@@ -377,13 +376,13 @@ export default function ProjectDetailsPage() {
               <span className="text-xs font-medium text-gray-500 mb-1">CURRENT STATUS</span>
               <div className={`text-2xl font-bold ${text} flex items-center`}>
                 <StatusIcon className="h-6 w-6 mr-2" />
-                {ragStatus}
+                {llmAiStatus}
               </div>
             </div>
           </div>
 
           {/* Critical Issues Section - Only shown for Red status */}
-          {ragStatus === 'Red' && (
+          {llmAiStatus === 'Red' && (
             <div className={`rounded-2xl border-l-4 ${border} ${bg} p-5 shadow-sm`}>
               <h3 className={`font-bold flex items-center ${text} mb-3`}>
                 <AlertTriangle className={`h-5 w-5 mr-2 ${icon}`} />
@@ -523,7 +522,7 @@ export default function ProjectDetailsPage() {
               ) : (
                 <div className="text-gray-500 italic text-sm">
                   <p>No specific path to green plan documented.</p>
-                  {ragStatus === 'Green' && (
+                  {llmAiStatus === 'Green' && (
                     <p className={`mt-1 ${text}`}>✓ Project is already in Green status.</p>
                   )}
                 </div>

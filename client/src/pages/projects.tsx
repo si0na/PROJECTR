@@ -47,7 +47,7 @@ function ExternalProjectCard({ project }: { project: ExternalProject }) {
   // New state for bulk updates
   const [bulkUpdates, setBulkUpdates] = useState<Array<{
     reportingDate: string;
-    ragStatus: string;
+    llmAiStatus: string;
     weeklyUpdateColumn: string;
     keyWeeklyUpdates: string;
     deliveryModel?: string;
@@ -57,7 +57,7 @@ function ExternalProjectCard({ project }: { project: ExternalProject }) {
     issuesChallenges?: string;
   }>>([{
     reportingDate: new Date().toISOString().split('T')[0],
-    ragStatus: '',
+    llmAiStatus: '',
     weeklyUpdateColumn: '',
     keyWeeklyUpdates: '',
     deliveryModel: '',
@@ -109,7 +109,7 @@ function ExternalProjectCard({ project }: { project: ExternalProject }) {
   const addBulkUpdateEntry = () => {
     setBulkUpdates([...bulkUpdates, {
       reportingDate: new Date().toISOString().split('T')[0],
-      ragStatus: '',
+      llmAiStatus: '',
       weeklyUpdateColumn: '',
       keyWeeklyUpdates: '',
       deliveryModel: '',
@@ -149,9 +149,9 @@ function ExternalProjectCard({ project }: { project: ExternalProject }) {
             </CardDescription>
           </div>
           <div className="flex gap-2 items-center">
-            {latestStatus?.ragStatus && (
-              <Badge className={`${getStatusColor(latestStatus.ragStatus)} font-medium`}>
-                {latestStatus.ragStatus}
+            {latestStatus?.llmAiStatus && (
+              <Badge className={`${getStatusColor(latestStatus.llmAiStatus)} font-medium`}>
+                {latestStatus.llmAiStatus}
               </Badge>
             )}
             {project.importance && (
@@ -166,9 +166,9 @@ function ExternalProjectCard({ project }: { project: ExternalProject }) {
       <CardContent className="flex-grow space-y-4">
         {/* AI Assessment at the top */}
         {latestStatus?.llmAiAssessmentDescription ? (
-          <div className={`p-3 rounded-lg border ${getStatusColor(latestStatus.ragStatus)}`}>
+          <div className={`p-3 rounded-lg border ${getStatusColor(latestStatus.llmAiStatus)}`}>
             <div className="flex items-start">
-              {latestStatus.ragStatus === 'Red' ? (
+              {latestStatus.llmAiStatus === 'Red' ? (
                 <AlertTriangle className="h-4 w-4 mt-0.5 mr-2 flex-shrink-0 text-red-600" />
               ) : (
                 <CheckCircle className="h-4 w-4 mt-0.5 mr-2 flex-shrink-0 text-green-600" />
@@ -317,8 +317,8 @@ function ExternalProjectCard({ project }: { project: ExternalProject }) {
                         <div>
                           <label className="block text-sm font-medium mb-1">RAG Status</label>
                           <Select
-                            value={update.ragStatus}
-                            onValueChange={(value) => handleBulkUpdateFieldChange(index, 'ragStatus', value)}
+                            value={update.llmAiStatus}
+                            onValueChange={(value) => handleBulkUpdateFieldChange(index, 'llmAiStatus', value)}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Select status" />
@@ -421,7 +421,7 @@ function ExternalProjectCard({ project }: { project: ExternalProject }) {
                     setShowBulkUpdateModal(false);
                     setBulkUpdates([{
                       reportingDate: new Date().toISOString().split('T')[0],
-                      ragStatus: '',
+                      llmAiStatus: '',
                       weeklyUpdateColumn: '',
                       keyWeeklyUpdates: '',
                       deliveryModel: '',
@@ -492,7 +492,7 @@ export default function Projects() {
     // Status filter
     if (
       statusFilter !== "all" &&
-      latestStatus?.ragStatus?.toLowerCase() !== statusFilter
+      latestStatus?.llmAiStatus?.toLowerCase() !== statusFilter
     ) {
       return false;
     }
@@ -547,8 +547,8 @@ export default function Projects() {
           )[0]
         : null;
       
-      valueA = latestStatusA?.ragStatus || "";
-      valueB = latestStatusB?.ragStatus || "";
+      valueA = latestStatusA?.llmAiStatus || "";
+      valueB = latestStatusB?.llmAiStatus || "";
       
       // Use the custom status order for comparison
       valueA = statusOrder[valueA as keyof typeof statusOrder] ?? 3;
