@@ -1,4 +1,5 @@
-import { useState } from "react";
+import React, { useRef, useState } from "react";
+import { Download, ClipboardCheck } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -618,6 +619,62 @@ export default function Projects() {
     console.log('Generating new assessment for all projects');
   };
 
+  // Excel Import/Template logic
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const url = "/api/projects/importExcel?llm_provider=gemini&aiAssessment=true";
+      const response = await fetch(url, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to import projects");
+      }
+
+      // Save the response as an Excel file
+      const blob = await response.blob();
+      let filename = "projects-import-result.xlsx";
+      const disposition = response.headers.get("content-disposition");
+      if (disposition && disposition.includes("filename=")) {
+        filename = disposition.split("filename=")[1].replace(/"/g, "") || filename;
+      }
+      const urlBlob = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = urlBlob;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(urlBlob);
+
+      alert("Projects imported successfully! Downloaded result file.");
+    } catch (err) {
+      alert("Failed to import projects. Please check your file and try again.");
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    // Do nothing for now, just a placeholder
+  };
+
   return (
     <div className="flex-1 overflow-auto">
       {/* Header */}
@@ -668,6 +725,44 @@ export default function Projects() {
       </div>
 
       <div className="max-w-7xl mx-auto p-6">
+        {/* Import/Download Buttons */}
+        <div className="flex justify-end gap-4 p-4">
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            ref={fileInputRef}
+            style={{ display: "none" }}
+            onChange={handleFileChange}
+          />
+          <button
+            onClick={handleImportClick}
+            disabled={importing}
+            className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm font-medium"
+          >
+            {importing ? (
+              <>
+                <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Importing...
+              </>
+            ) : (
+              <>
+                <ClipboardCheck className="h-4 w-4 mr-2" />
+                Import Projects Excel
+              </>
+            )}
+          </button>
+          <button
+            onClick={handleDownloadTemplate}
+            className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm font-medium"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download Projects Template
+          </button>
+        </div>
+
         {/* Filters and Sorting */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex flex-col lg:flex-row gap-4">
