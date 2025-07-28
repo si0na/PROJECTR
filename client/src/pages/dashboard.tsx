@@ -1,14 +1,6 @@
 import { useState } from "react";
-// import { useQuery } from "@tanstack/react-query";
-import {
-  Plus,
-  RefreshCw,
-  Download,
-  ClipboardCheck,
-  Bot,
-  ArrowRight,
-  Calendar,
-} from "lucide-react";
+import { AIAssessmentHeader } from "@/components/dashboard/ai-assessment-header";
+import { AnalyticsOverview } from "@/components/dashboard/analytics-overview";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -24,32 +16,27 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { AIAssessmentHeader } from "@/components/dashboard/ai-assessment-header";
 import { SearchBar } from "@/components/dashboard/search-bar";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
-import { AnalyticsOverview } from "@/components/dashboard/analytics-overview";
 import { ProjectCard } from "@/components/dashboard/project-card";
 import { WeeklyReportForm } from "@/components/forms/weekly-report-form";
 import { useAuth } from "@/hooks/use-auth";
 import { USER_ROLES } from "@/lib/constants";
 import type { Project, WeeklyStatusReport } from "@shared/schema";
 
-const PEOPLE = [
-  { name: "Raja", value: "Raja", level: "DELIVERY_MANAGER" },
-  { name: "Ani", value: "Ani", level: "DELIVERY_MANAGER" },
-  { name: "Vijo Jacob", value: "Vijo Jacob", level: "PROJECT_MANAGER" },
-  { name: "Yamuna Rani M", value: "Yamuna Rani M", level: "PROJECT_MANAGER" },
-  { name: "Ashwathy Nair", value: "Ashwathy Nair", level: "PROJECT_MANAGER" },
-  { name: "Shanavaz A", value: "Shanavaz A", level: "PROJECT_MANAGER" },
-  { name: "ORG Head", value: "ORG Head", level: "ORG_HEAD" }
-];
+interface DashboardProps {
+  selectedPerson: { name: string; value: string; level: string } | null;
+  setSelectedPerson: (person: { name: string; value: string; level: string } | null) => void;
+}
 
-export default function Dashboard() {
+export default function DashboardPage({
+  selectedPerson,
+  setSelectedPerson
+}: DashboardProps) {
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [importanceFilter, setImportanceFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [selectedPerson, setSelectedPerson] = useState(PEOPLE[0]);
 
   const { user } = useAuth();
 
@@ -157,12 +144,6 @@ export default function Dashboard() {
     createdAt: new Date().toISOString(),
   }));
 
-  const projectsLoading = false;
-  const reportsLoading = false;
-
-  // No-op for handleRefresh since we use static data
-  const handleRefresh = () => {};
-
   const getLatestReportForProject = (projectId: number) => {
     return weeklyReports.find((r) => r.projectId === projectId);
   };
@@ -232,41 +213,39 @@ export default function Dashboard() {
 
   const dashboardProjects = getDashboardProjects();
 
-  const isLoading = projectsLoading || reportsLoading;
-
   return (
-    <div className="bg-gray-50 min-h-full">
-      {/* Pass selectedPerson and onPersonChange to AIAssessmentHeader if needed */}
-      <AIAssessmentHeader selectedPerson={selectedPerson} onPersonChange={setSelectedPerson} />
-
-      <div className="max-w-7xl mx-auto p-8">
-        {/* Header with filters */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 space-y-4 lg:space-y-0">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Portfolio Dashboard
-            </h1>
-            <p className="text-gray-600">
-              Real-time insights and priority project tracking
-            </p>
+    <>
+      {selectedPerson && (
+        <AIAssessmentHeader selectedPerson={selectedPerson} />
+      )}
+      <div className="bg-gray-50 min-h-full">
+        <div className="max-w-7xl mx-auto p-8">
+          {/* Header with filters */}
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 space-y-4 lg:space-y-0">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Portfolio Dashboard
+              </h1>
+              <p className="text-gray-600">
+                Real-time insights and priority project tracking
+              </p>
+            </div>
           </div>
-
-          {/* Removed status/priority dropdowns and refresh icon for a cleaner, more relevant dashboard header */}
-        </div>
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-          {/* Left Column - Analytics and Priority Projects */}
-          <div className="xl:col-span-2 space-y-8">
-            {/* Analytics Overview */}
-            <AnalyticsOverview selectedPerson={selectedPerson} />
-          </div>
-
-          {/* Right Column - Quick Actions */}
-          <div className="space-y-8">
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+            {/* Left Column - Analytics and Priority Projects */}
+            <div className="xl:col-span-2 space-y-8">
+              {/* Only keep this Analytics Overview graph */}
+              {selectedPerson && <AnalyticsOverview selectedPerson={selectedPerson} />}
+              {/* ...other dashboard content if any... */}
+            </div>
+            {/* Right Column - Quick Actions */}
+            <div className="space-y-8">
+              {/* ...existing code... */}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

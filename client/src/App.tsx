@@ -6,6 +6,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Navbar } from "@/components/layout/navbar";
+import { AIAssessmentHeader } from "@/components/dashboard/ai-assessment-header";
+import { AnalyticsOverview } from "@/components/dashboard/analytics-overview";
 import { useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
@@ -22,6 +24,9 @@ function AppContent() {
   const { user, isLoading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // User selection state for Navbar and dashboard
+  const [selectedPerson, setSelectedPerson] = useState<{ name: string; value: string; level: string } | null>(null);
 
   if (isLoading) {
     return (
@@ -49,17 +54,26 @@ function AppContent() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      <Navbar onSidebarToggle={() => setSidebarOpen(!sidebarOpen)} />
+      <Navbar
+        onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+        selectedPerson={selectedPerson}
+        setSelectedPerson={setSelectedPerson}
+      />
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar 
-          isOpen={sidebarOpen} 
+        <Sidebar
+          isOpen={sidebarOpen}
           isCollapsed={sidebarCollapsed}
           onClose={() => setSidebarOpen(false)}
           toggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
         <main className="flex-1 overflow-auto">
           <Switch>
-            <Route path="/" component={Dashboard} />
+            <Route path="/">
+              <Dashboard
+                selectedPerson={selectedPerson}
+                setSelectedPerson={setSelectedPerson}
+              />
+            </Route>
             <Route path="/projects" component={Projects} />
             <Route path="/projects/:id" component={ProjectDetailsPage} />
             <Route path="/weekly-reports" component={WeeklyReports} />

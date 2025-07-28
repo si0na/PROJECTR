@@ -1,18 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from "recharts";
 import { TrendingUp } from "lucide-react";
-import { externalApiRequest } from "@/lib/queryClient";
 import React from "react";
-
-const PEOPLE = [
-  { name: "Raja", value: "Raja", level: "DELIVERY_MANAGER" },
-  { name: "Ani", value: "Ani", level: "DELIVERY_MANAGER" },
-  { name: "Vijo Jacob", value: "Vijo Jacob", level: "PROJECT_MANAGER" },
-  { name: "Yamuna Rani M", value: "Yamuna Rani M", level: "PROJECT_MANAGER" },
-  { name: "Ashwathy Nair", value: "Ashwathy Nair", level: "PROJECT_MANAGER" },
-  { name: "Shanavaz A", value: "Shanavaz A", level: "PROJECT_MANAGER" },
-  { name: "ORG Head", value: "ORG Head", level: "ORG_HEAD" }
-];
 
 interface AssessmentTrend {
   assessmentDate: string;
@@ -62,9 +51,16 @@ export function AnalyticsOverview({ selectedPerson }: AnalyticsOverviewProps) {
 
   const { data: assessments, isLoading, error, refetch } = useQuery<Assessment[]>({
     queryKey: ['organizational-assessments', selectedPerson.value, selectedPerson.level],
-    queryFn: () => externalApiRequest(
-      `/api/organizational-assessments/dashboard?assessedPersonName=${selectedPerson.value}&assessmentLevel=${selectedPerson.level}`
-    ),
+    queryFn: () => {
+      // Log the selected user and API call
+      console.log("Analytics Overview selected user:", {
+        preferredName: selectedPerson.value,
+        role: selectedPerson.level
+      });
+      const url = `http://34.63.198.88:8080/api/organizational-assessments/dashboard?assessedPersonName=${encodeURIComponent(selectedPerson.value)}&assessmentLevel=${encodeURIComponent(selectedPerson.level)}`;
+      console.log("Analytics Overview API Call:", url);
+      return fetch(url).then(res => res.json());
+    },
     enabled: !!selectedPerson.value && !!selectedPerson.level
   });
 

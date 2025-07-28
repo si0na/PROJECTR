@@ -132,28 +132,19 @@ const DELIVERY_MANAGERS: Manager[] = [
   { name: "Ani", value: "Ani" }
 ];
 
-// Add all people and their levels
-const PEOPLE = [
-  { name: "Raja", value: "Raja", level: "DELIVERY_MANAGER" },
-  { name: "Ani", value: "Ani", level: "DELIVERY_MANAGER" },
-  { name: "Vijo Jacob", value: "Vijo Jacob", level: "PROJECT_MANAGER" },
-  { name: "Yamuna Rani M", value: "Yamuna Rani M", level: "PROJECT_MANAGER" },
-  { name: "Ashwathy Nair", value: "Ashwathy Nair", level: "PROJECT_MANAGER" },
-  { name: "Shanavaz A", value: "Shanavaz A", level: "PROJECT_MANAGER" },
-  { name: "ORG Head", value: "ORG Head", level: "ORG_HEAD" }
-];
+// Remove the hardcoded PEOPLE array and any logic using it
 
 interface AIAssessmentHeaderProps {
-  selectedPerson?: { name: string; value: string; level: string };
+  selectedPerson: { name: string; value: string; level: string };
   onPersonChange?: (person: { name: string; value: string; level: string }) => void;
 }
 
 export function AIAssessmentHeader({
-  selectedPerson: propSelectedPerson,
+  selectedPerson,
   onPersonChange
 }: AIAssessmentHeaderProps) {
   // Use the first person as default
-  const [internalSelectedPerson, setInternalSelectedPerson] = React.useState(PEOPLE[0]);
+  const [internalSelectedPerson, setInternalSelectedPerson] = React.useState(selectedPerson);
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
   const [, setLocation] = useLocation();
@@ -163,34 +154,15 @@ export function AIAssessmentHeader({
   // Add pagination state
   const [aiPage, setAiPage] = React.useState(0);
 
-  const selectedPerson = propSelectedPerson || internalSelectedPerson;
-
   // Use selectedPerson.value and selectedPerson.level in API
   const { data: assessments, isLoading, error, refetch } = useQuery<Assessment[]>({
-    queryKey: ["assessments", selectedPerson.value, selectedPerson.level],
-    queryFn: async () => {
-      const response = await fetch(
-        `http://34.63.198.88/api/organizational-assessments/dashboard?assessedPersonName=${selectedPerson.value}&assessmentLevel=${selectedPerson.level}`
-      );
-      
-      if (!response.ok) {
-        const text = await response.text();
-        if (text.startsWith("<!DOCTYPE")) {
-          throw new Error("Server returned HTML error page");
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const contentType = response.headers.get("content-type");
-      if (!contentType?.includes("application/json")) {
-        throw new Error("Invalid content type, expected JSON");
-      }
-
-      const json = await response.json();
-      console.log("AI Assessment Dashboard API Response:", json);
-      return json;
+    queryKey: ['organizational-assessments', selectedPerson.value, selectedPerson.level],
+    queryFn: () => {
+      const url = `http://34.63.198.88:8080/api/organizational-assessments/dashboard?assessedPersonName=${encodeURIComponent(selectedPerson.value)}&assessmentLevel=${encodeURIComponent(selectedPerson.level)}`;
+      console.log("AI Assessment Header API Call:", url);
+      return fetch(url).then(res => res.json());
     },
-    retry: 2
+    enabled: !!selectedPerson.value && !!selectedPerson.level
   });
 
   const currentAssessment = React.useMemo(() => {
@@ -394,15 +366,6 @@ const filteredProjects = React.useMemo(() => {
     }
   };
 
-  const handlePersonSelect = (person: typeof PEOPLE[0]) => {
-    if (onPersonChange) {
-      onPersonChange(person);
-    } else {
-      setInternalSelectedPerson(person);
-    }
-    setIsDropdownOpen(false);
-  };
-
   // Helper to clean up bullet points and unwanted symbols
   const cleanText = (text?: string): string[] => {
     if (!text) return [];
@@ -496,37 +459,16 @@ const filteredProjects = React.useMemo(() => {
   return (
     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-b border-blue-100 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row justify-between gap-3 mb-4">
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="flex items-center px-3 py-1.5 md:px-4 md:py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-lg shadow-sm transition font-medium border border-gray-300 text-sm md:text-base w-full sm:w-auto"
-            >
-              {selectedPerson.name} <span className="ml-2 text-xs text-gray-500">({selectedPerson.level.replace("_", " ")})</span>
-              <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${isDropdownOpen ? 'transform rotate-180' : ''}`} />
-            </button>
-            {isDropdownOpen && (
-              <div className="absolute z-10 mt-1 w-full bg-white rounded-lg shadow-lg border border-gray-200">
-                <ul className="py-1 max-h-60 overflow-y-auto">
-                  {PEOPLE.map((person) => (
-                    <li key={person.value + person.level}>
-                      <button
-                        onClick={() => handlePersonSelect(person)}
-                        className={`w-full text-left px-3 py-2 hover:bg-blue-50 text-sm ${
-                          selectedPerson.value === person.value && selectedPerson.level === person.level
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'text-gray-700'
-                        }`}
-                      >
-                        {person.name} <span className="ml-2 text-xs text-gray-500">({person.level.replace("_", " ")})</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 md:mb-6">
+          <div className="flex items-center space-x-2 md:space-x-3">
+            <div className="w-10 h-10 md:w-12 md:h-12 bg-white border border-blue-200 rounded-2xl flex items-center justify-center shadow-sm">
+              <Bot className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900">AI Portfolio Intelligence</h2>
+              <p className="text-blue-600 font-medium text-sm md:text-base">Automated insights and risk analysis</p>
+            </div>
           </div>
-          
           <button
             onClick={handleGenerateAssessment}
             disabled={isGenerating}
@@ -548,24 +490,14 @@ const filteredProjects = React.useMemo(() => {
             )}
           </button>
         </div>
-
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 md:mb-6">
-          <div className="flex items-center space-x-2 md:space-x-3">
-            <div className="w-10 h-10 md:w-12 md:h-12 bg-white border border-blue-200 rounded-2xl flex items-center justify-center shadow-sm">
-              <Bot className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
-            </div>
-            <div>
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900">AI Portfolio Intelligence</h2>
-              <p className="text-blue-600 font-medium text-sm md:text-base">Automated insights and risk analysis</p>
-            </div>
-          </div>
-          {analysis && (
-            <div className="text-xs text-gray-500 bg-white/80 px-2 py-1 md:px-3 md:py-1.5 rounded-full border border-blue-100 shadow-sm">
+        {/* Last updated below the button, rounded, and centered on small screens */}
+        {analysis && (
+          <div className="mt-2 mb-4 flex justify-start">
+            <div className="text-xs text-gray-500 bg-white/80 px-3 py-1 rounded-full border border-blue-100 shadow-sm">
               Last updated: {formatDate(analysis.analysisDate)}
             </div>
-          )}
-        </div>
-
+          </div>
+        )}
         <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 md:p-6 border border-blue-200 shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-4 md:mb-6">
             <div className={`rounded-lg p-3 md:p-4 border-2 ${getStatusBgColor(analysis?.overallPortfolioRagStatus)} relative`}>
