@@ -47,6 +47,7 @@ interface Project {
 interface Assessment {
   assessmentId: number;
   assessedPersonName: string;
+  assessedPersonUserId?: string; // Add this if your API returns it
   organizationUnit: string;
   assessmentDate: string;
   assessmentLevel: string;
@@ -135,8 +136,8 @@ const DELIVERY_MANAGERS: Manager[] = [
 // Remove the hardcoded PEOPLE array and any logic using it
 
 interface AIAssessmentHeaderProps {
-  selectedPerson: { name: string; value: string; level: string };
-  onPersonChange?: (person: { name: string; value: string; level: string }) => void;
+  selectedPerson: { userId: string; name: string; level: string };
+  onPersonChange?: (person: { userId: string; name: string; level: string }) => void;
 }
 
 export function AIAssessmentHeader({
@@ -156,19 +157,33 @@ export function AIAssessmentHeader({
 
   // Use selectedPerson.value and selectedPerson.level in API
   const { data: assessments, isLoading, error, refetch } = useQuery<Assessment[]>({
-    queryKey: ['organizational-assessments', selectedPerson.value, selectedPerson.level],
+    queryKey: ['organizational-assessments', selectedPerson.userId],
     queryFn: () => {
-      const url = `http://34.63.198.88:8080/api/organizational-assessments/dashboard?assessedPersonName=${encodeURIComponent(selectedPerson.value)}&assessmentLevel=${encodeURIComponent(selectedPerson.level)}`;
-      console.log("AI Assessment Header API Call:", url);
-      return fetch(url).then(res => res.json());
+      const url = `http://34.63.198.88:8080/api/assessments/dashboard?assessedPersonUserId=${encodeURIComponent(selectedPerson.userId)}`;
+      return fetch(url)
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+          return res.json();
+        })
+        .catch(err => {
+          console.error("Failed to fetch assessments:", err);
+          throw err;
+        });
     },
-    enabled: !!selectedPerson.value && !!selectedPerson.level
+    enabled: !!selectedPerson.userId
   });
 
   const currentAssessment = React.useMemo(() => {
     if (!assessments || assessments.length === 0) return null;
-    return assessments.find(a => a.assessedPersonName === selectedPerson.value) || assessments[0];
-  }, [assessments, selectedPerson]);
+    if (Array.isArray(assessments)) {
+      return (
+        assessments.find(a => a.assessedPersonUserId === selectedPerson.userId) ||
+        assessments.find(a => a.assessedPersonName === selectedPerson.name) ||
+        assessments[0]
+      );
+    }
+    return assessments;
+  }, [assessments, selectedPerson.userId, selectedPerson.name]);
 
   const analysis = React.useMemo<PortfolioAnalysis | null>(() => {
     if (!currentAssessment) return null;
@@ -272,29 +287,29 @@ const filteredProjects = React.useMemo(() => {
     gradient: string;
     showScore: boolean;
   } => {
-    if (score === null) {
-    return {
-      value: "N/A",
-      color: { bg: "from-gray-50 to-gray-100", border: "border-gray-200", text: "text-gray-500" },
-      gradient: "from-gray-400 to-gray-500",
-      showScore: false
-    };
-  }
+    if (score === null || score === undefined || isNaN(Number(score))) {
+      return {
+        value: "N/A",
+        color: { bg: "from-gray-50 to-gray-100", border: "border-gray-200", text: "text-gray-500" },
+        gradient: "from-gray-400 to-gray-500",
+        showScore: false
+      };
+    }
     
     if (score > 5) return { 
-      value: score.toString(),
+      value: String(score),
       color: { bg: "from-green-50 to-emerald-50", border: "border-green-200", text: "text-green-600" },
       gradient: "from-green-500 to-emerald-500",
       showScore: true
     };
     if (score === 5) return { 
-      value: score.toString(),
+      value: String(score),
       color: { bg: "from-amber-50 to-yellow-50", border: "border-amber-200", text: "text-amber-600" },
       gradient: "from-amber-500 to-yellow-500",
       showScore: true
     };
     return { 
-      value: score.toString(),
+      value: String(score),
       color: { bg: "from-red-50 to-rose-50", border: "border-red-200", text: "text-red-600" },
       gradient: "from-red-500 to-rose-500",
       showScore: true
@@ -322,45 +337,39 @@ const filteredProjects = React.useMemo(() => {
   const [isGenerating, setIsGenerating] = React.useState(false);
 
   const handleGenerateAssessment = async () => {
-    if (!selectedPerson) {
+    if (!selectedPerson?.userId) {
       alert("Please select a person first");
       return;
     }
-    
+
     setIsGenerating(true);
     try {
-      const response = await fetch("http://34.63.198.88/api/organizational-assessments/generate", {
+      const url = "http://34.63.198.88:8080/api/assessments/generate";
+      
+      const response = await fetch(url, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          assessmentLevel: selectedPerson.level,
-          assessedPersonName: selectedPerson.value,
-          llmProvider: "gemini",
+          assessedPersonUserId: selectedPerson.userId,
           reAssess: true
         })
       });
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error("API Error Response:", errorText);
+        throw new Error(`Failed to generate assessment: ${response.status} ${response.statusText}`);
       }
 
       const result = await response.json();
-      
-      // Show success message
       alert("Assessment generated successfully!");
-      
-      // Refetch the data after a short delay to get the latest assessment
-      setTimeout(() => {
-        refetch();
-      }, 2000);
-      
+      setTimeout(() => refetch(), 2000);
       return result;
     } catch (error) {
-      console.error("Error generating assessment:", error);
-      alert(`Failed to generate assessment: ${error instanceof Error ? error.message : String(error)}`);
+      console.error("API Call Failed:", error);
+      alert(`Error: ${error instanceof Error ? error.message : "Failed to generate assessment"}`);
     } finally {
       setIsGenerating(false);
     }

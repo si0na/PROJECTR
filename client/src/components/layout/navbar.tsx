@@ -31,8 +31,8 @@ import {
 
 type NavbarProps = {
   onSidebarToggle: () => void;
-  selectedPerson?: { name: string; value: string; level: string } | null;
-  setSelectedPerson?: (person: { name: string; value: string; level: string }) => void;
+  selectedPerson?: { userId: string; name: string; level: string } | null;
+  setSelectedPerson?: (person: { userId: string; name: string; level: string }) => void;
 };
 
 const levelMap: Record<string, string> = {
@@ -48,7 +48,7 @@ export function Navbar({ onSidebarToggle, selectedPerson, setSelectedPerson }: N
     { preferredName: string; role: string; userId: string }[]
   >([]);
   // Internal fallback if setSelectedPerson is not provided
-  const [internalSelectedPerson, setInternalSelectedPerson] = useState<{ name: string; value: string; level: string } | null>(null);
+  const [internalSelectedPerson, setInternalSelectedPerson] = useState<{ userId: string; name: string; level: string } | null>(null);
 
   // Use prop if provided, else fallback to internal state
   const effectiveSelectedPerson = selectedPerson ?? internalSelectedPerson;
@@ -88,8 +88,8 @@ export function Navbar({ onSidebarToggle, selectedPerson, setSelectedPerson }: N
         if (filtered.length > 0 && !effectiveSelectedPerson) {
           const firstUser = filtered[0];
           effectiveSetSelectedPerson({
+            userId: firstUser.userId,
             name: firstUser.preferredName,
-            value: firstUser.preferredName,
             level: levelMap[firstUser.role] || firstUser.role,
           });
         }
@@ -98,11 +98,11 @@ export function Navbar({ onSidebarToggle, selectedPerson, setSelectedPerson }: N
   }, [effectiveSetSelectedPerson, effectiveSelectedPerson]);
 
   const handleUserChange = (val: string) => {
-    const foundUser = users.find((u) => u.preferredName === val);
+    const foundUser = users.find((u) => u.userId === val);
     if (foundUser) {
       effectiveSetSelectedPerson({
+        userId: foundUser.userId,
         name: foundUser.preferredName,
-        value: foundUser.preferredName,
         level: levelMap[foundUser.role] || foundUser.role,
       });
     }
@@ -210,7 +210,7 @@ export function Navbar({ onSidebarToggle, selectedPerson, setSelectedPerson }: N
                     Assessed Person
                   </label>
                   <Select
-                    value={effectiveSelectedPerson?.name || ""}
+                    value={effectiveSelectedPerson?.userId || ""}
                     onValueChange={handleUserChange}
                   >
                     <SelectTrigger className="w-full h-8">
@@ -218,7 +218,7 @@ export function Navbar({ onSidebarToggle, selectedPerson, setSelectedPerson }: N
                     </SelectTrigger>
                     <SelectContent>
                       {users.map((u) => (
-                        <SelectItem key={u.userId} value={u.preferredName}>
+                        <SelectItem key={u.userId} value={u.userId}>
                           {u.preferredName} ({getRoleDisplayName(u.role)})
                         </SelectItem>
                       ))}

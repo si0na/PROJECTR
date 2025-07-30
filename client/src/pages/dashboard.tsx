@@ -25,8 +25,8 @@ import { USER_ROLES } from "@/lib/constants";
 import type { Project, WeeklyStatusReport } from "@shared/schema";
 
 interface DashboardProps {
-  selectedPerson: { name: string; value: string; level: string } | null;
-  setSelectedPerson: (person: { name: string; value: string; level: string } | null) => void;
+  selectedPerson: { userId: string; name: string; level: string } | null;
+  setSelectedPerson: (person: { userId: string; name: string; level: string } | null) => void;
 }
 
 export default function DashboardPage({
@@ -216,7 +216,10 @@ export default function DashboardPage({
   return (
     <>
       {selectedPerson && (
-        <AIAssessmentHeader selectedPerson={selectedPerson} />
+        <AIAssessmentHeader
+          selectedPerson={selectedPerson}
+          onPersonChange={setSelectedPerson}
+        />
       )}
       <div className="bg-gray-50 min-h-full">
         <div className="max-w-7xl mx-auto p-8">
@@ -236,7 +239,11 @@ export default function DashboardPage({
             {/* Left Column - Analytics and Priority Projects */}
             <div className="xl:col-span-2 space-y-8">
               {/* Only keep this Analytics Overview graph */}
-              {selectedPerson && <AnalyticsOverview selectedPerson={selectedPerson} />}
+              {selectedPerson && (
+                <AnalyticsOverview
+                  selectedPerson={selectedPerson}
+                />
+              )}
               {/* ...other dashboard content if any... */}
             </div>
             {/* Right Column - Quick Actions */}

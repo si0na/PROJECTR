@@ -26,7 +26,7 @@ function AppContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // User selection state for Navbar and dashboard
-  const [selectedPerson, setSelectedPerson] = useState<{ name: string; value: string; level: string } | null>(null);
+  const [selectedPerson, setSelectedPerson] = useState<{ userId: string; name: string; level: string } | null>(null);
 
   if (isLoading) {
     return (
